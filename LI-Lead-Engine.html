@@ -175,6 +175,15 @@
     </div>
     <button class="btn small" onclick="saveSettings()">Save</button>
     <span class="note">Saved on this computer only.</span>
+    <div id="syncBox" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">🔄 Sync your pipeline across devices</label>
+      <span id="syncControls">
+        <input type="text" id="setSync" placeholder="Make up a sync code, e.g. dom-troiano-8817" size="30">
+        <button class="btn small" onclick="saveSync()">Enable sync</button>
+      </span>
+      <span class="note" id="syncStatus"></span>
+      <div class="note">Enter the <b>same code</b> on your phone and office computer and your pipeline, notes, and follow-ups stay in sync everywhere. Pick something long and unguessable — the code is the key to your list.</div>
+    </div>
   </div>
   <div id="tmplList"></div>
 </div>
@@ -211,7 +220,8 @@
       <li>Source: NY Dept. of State "Active Corporations" dataset on data.ny.gov (official state open-data portal).</li>
       <li>The address shown is the "process address" — where legal papers go. It's usually the owner's home or the business location; either way it's a valid mailing address.</li>
       <li>Some filings list a registered-agent company (LegalZoom etc.) instead of the owner's address — those are marked and less useful for mail, but still worth a Google.</li>
-      <li>An internet connection is required to refresh leads. Your pipeline and notes are saved on this computer (they never leave it).</li>
+      <li>An internet connection is required to refresh leads. Your pipeline and notes are saved on this device — and if you set a <b>sync code</b> (Scripts &amp; Letters tab), they also sync privately across your phone and computer.</li>
+      <li>📬 A fresh <a href="digest.html">daily lead digest</a> is posted every weekday morning — and can be emailed to you automatically.</li>
     </ul>
   </div>
 </div>
@@ -219,6 +229,7 @@
 </main>
 <div class="toast" id="toast"></div>
 
+<script src="sync-config.js"></script>
 <script>
 "use strict";
 /* ================= state ================= */
@@ -227,7 +238,8 @@ let leads=[], pipeline=[], hidden={}, settings={};
 try{pipeline=JSON.parse(localStorage.getItem(LS_PIPE)||'[]')}catch(e){pipeline=[]}
 try{hidden=JSON.parse(localStorage.getItem(LS_HIDE)||'{}')}catch(e){hidden={}}
 try{settings=JSON.parse(localStorage.getItem(LS_SET)||'{}')}catch(e){settings={}}
-settings=Object.assign({name:'Dom Orza',agency:'The Troiano Agency – Allstate',phone:'(631) 724-2100',email:''},settings);
+settings=Object.assign({name:'Dom Orza',agency:'The Troiano Agency – Allstate',phone:'(631) 724-2100',email:'',syncCode:''},settings);
+function activePipe(){return pipeline.filter(p=>!p.deleted)}
 
 const SMITHTOWN_ZIPS=['11787','11780','11767','11754','11725','11788','11733','11720'];
 
@@ -320,7 +332,7 @@ function renderLeads(){
   document.getElementById('stHot').textContent=out.filter(l=>l.cls.weight>=3).length;
   document.getElementById('stWeek').textContent=out.filter(l=>l.ageDays<=7).length;
   if(!out.length){list.innerHTML='<div class="empty">No filings match these filters. Widen the date range or clear the town filter.</div>';return}
-  const inPipe=new Set(pipeline.map(p=>p.id));
+  const inPipe=new Set(activePipe().map(p=>p.id));
   list.innerHTML=out.slice(0,400).map(l=>{
     const g='https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+l.city+' NY');
     const m='https://www.google.com/maps/search/'+encodeURIComponent(l.addr+', '+l.city+' NY '+l.zip);
@@ -351,22 +363,24 @@ function hideLead(id){hidden[id]=1;localStorage.setItem(LS_HIDE,JSON.stringify(h
 
 /* ================= pipeline ================= */
 function addToPipe(id){
-  const l=leads.find(x=>x.id===id); if(!l||pipeline.some(p=>p.id===id))return;
+  const l=leads.find(x=>x.id===id); if(!l)return;
+  const ex=pipeline.find(p=>p.id===id);
+  if(ex){ if(ex.deleted){ex.deleted=false;ex.status='New';ex.ts=Date.now();savePipe();renderLeads();toast('Added back to pipeline')} return }
   pipeline.unshift({id:l.id,name:l.name,addr:l.addr,city:l.city,zip:l.zip,county:l.county,filed:l.filed,lines:l.cls.lines,label:l.cls.label,
-    status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10)});
+    status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10),ts:Date.now()});
   savePipe();renderLeads();toast('Added to pipeline — set a follow-up date in the Pipeline tab');
 }
 function addManualLead(){
   const name=prompt('Business / prospect name:'); if(!name)return;
   pipeline.unshift({id:'man'+Date.now(),name,addr:'',city:'',zip:'',county:'',filed:'',lines:'',label:'Manual',
-    status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10)});
+    status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10),ts:Date.now()});
   savePipe();renderPipeline();
 }
-function savePipe(){localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));document.getElementById('pipeCount').textContent=pipeline.filter(p=>['New','Contacted','Quoting'].includes(p.status)).length}
+function savePipe(){localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));document.getElementById('pipeCount').textContent=activePipe().filter(p=>['New','Contacted','Quoting'].includes(p.status)).length;schedulePush()}
 function renderPipeline(){
   savePipe();
   const f=document.getElementById('pFilter').value;
-  let items=pipeline.filter(p=> f==='all'?true : f==='active'?['New','Contacted','Quoting'].includes(p.status) : p.status===f);
+  let items=activePipe().filter(p=> f==='all'?true : f==='active'?['New','Contacted','Quoting'].includes(p.status) : p.status===f);
   const today=new Date().toISOString().slice(0,10);
   items.sort((a,b)=>(a.followUp||'9999').localeCompare(b.followUp||'9999'));
   const el=document.getElementById('pipeList');
@@ -395,10 +409,10 @@ function renderPipeline(){
     '</div>';
   }).join('');
 }
-function setStatus(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.status=v;savePipe();renderPipeline();if(v==='Won')toast('🏆 Nice one!')}}
-function setFollow(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.followUp=v;savePipe();renderPipeline()}}
-function setNotes(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.notes=v;savePipe()}}
-function delPipe(id){if(!confirm('Remove this prospect from your pipeline?'))return;pipeline=pipeline.filter(x=>x.id!==id);savePipe();renderPipeline()}
+function setStatus(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.status=v;p.ts=Date.now();savePipe();renderPipeline();if(v==='Won')toast('🏆 Nice one!')}}
+function setFollow(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.followUp=v;p.ts=Date.now();savePipe();renderPipeline()}}
+function setNotes(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.notes=v;p.ts=Date.now();savePipe()}}
+function delPipe(id){if(!confirm('Remove this prospect from your pipeline?'))return;const p=pipeline.find(x=>x.id===id);if(p){p.deleted=true;p.ts=Date.now()}savePipe();renderPipeline()}
 
 /* ================= CSV export ================= */
 function csvEscape(v){v=String(v==null?'':v);return '"'+v.replace(/"/g,'""')+'"'}
@@ -416,9 +430,10 @@ function exportLeadsCSV(){
   toast('CSV downloaded — ready for a mail merge');
 }
 function exportPipeCSV(){
-  if(!pipeline.length){toast('Pipeline is empty');return}
+  const items=activePipe();
+  if(!items.length){toast('Pipeline is empty');return}
   downloadCSV([['Business Name','Status','Follow-up','Address','City','ZIP','Filed','Suggested Lines','Notes','Added']]
-    .concat(pipeline.map(p=>[p.name,p.status,p.followUp,p.addr,p.city,p.zip,p.filed,p.lines,p.notes,p.added])),'pipeline-'+new Date().toISOString().slice(0,10)+'.csv');
+    .concat(items.map(p=>[p.name,p.status,p.followUp,p.addr,p.city,p.zip,p.filed,p.lines,p.notes,p.added])),'pipeline-'+new Date().toISOString().slice(0,10)+'.csv');
 }
 
 /* ================= templates ================= */
@@ -492,10 +507,62 @@ function saveSettings(){
   localStorage.setItem(LS_SET,JSON.stringify(settings));renderTemplates();toast('Saved');
 }
 
+/* ================= cloud sync (optional, Firestore REST) ================= */
+const SYNC=(window.SYNC_CONFIG&&window.SYNC_CONFIG.projectId&&window.SYNC_CONFIG.apiKey)?window.SYNC_CONFIG:null;
+let syncTimer=null,syncBusy=false;
+function syncEnabled(){return !!(SYNC&&settings.syncCode)}
+function fsUrl(){return 'https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/pipelines/'+encodeURIComponent(settings.syncCode)+'?key='+SYNC.apiKey}
+function setSyncStatus(msg,bad){const el=document.getElementById('syncStatus');if(el){el.textContent=msg;el.style.color=bad?'var(--red)':'var(--green)'}}
+function mergeRemote(remote){
+  const map=new Map(pipeline.map(p=>[p.id,p]));
+  for(const r of remote){const l=map.get(r.id);if(!l||(r.ts||0)>(l.ts||0))map.set(r.id,r)}
+  const cut=Date.now()-60*864e5;
+  pipeline=[...map.values()].filter(p=>!(p.deleted&&(p.ts||0)<cut));
+  pipeline.sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
+async function pullCloud(push){
+  if(!syncEnabled()||syncBusy)return;
+  syncBusy=true;
+  try{
+    const r=await fetch(fsUrl());
+    let remote=[];
+    if(r.status===404){remote=[]}
+    else if(r.ok){const d=await r.json();try{remote=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}catch(e){remote=[]}}
+    else throw new Error('HTTP '+r.status);
+    mergeRemote(remote);
+    localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));
+    document.getElementById('pipeCount').textContent=activePipe().filter(p=>['New','Contacted','Quoting'].includes(p.status)).length;
+    if(document.getElementById('panel-pipeline').classList.contains('active'))renderPipeline();
+    if(leads.length)renderLeads();
+    if(push!==false){
+      const body={fields:{data:{stringValue:JSON.stringify(pipeline)},updated:{integerValue:String(Date.now())}}};
+      const w=await fetch(fsUrl(),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      if(!w.ok)throw new Error('HTTP '+w.status);
+    }
+    setSyncStatus('✓ Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
+  }catch(e){setSyncStatus('⚠ Sync unavailable — working from this device’s copy',true)}
+  finally{syncBusy=false}
+}
+function schedulePush(){if(!syncEnabled())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>pullCloud(true),1500)}
+function saveSync(){
+  const code=document.getElementById('setSync').value.trim();
+  settings.syncCode=code;localStorage.setItem(LS_SET,JSON.stringify(settings));
+  if(syncEnabled()){setSyncStatus('Connecting…');pullCloud(true)}
+  else setSyncStatus(code?'Sync is not configured on this site yet':'Enter a code to enable sync',true);
+}
+function initSyncUI(){
+  const box=document.getElementById('syncBox');
+  if(!SYNC){box.querySelector('#syncControls').style.display='none';box.querySelector('.note:last-child').textContent='Cloud sync is not switched on for this site yet — your pipeline is saved on this device only.';return}
+  document.getElementById('setSync').value=settings.syncCode||'';
+  if(syncEnabled())pullCloud(false);
+}
+if(SYNC){setInterval(()=>pullCloud(false),90e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pullCloud(false)})}
+
 /* ================= util ================= */
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 document.getElementById('todayLabel').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 savePipe();
+initSyncUI();
 </script>
 </body>
 </html>

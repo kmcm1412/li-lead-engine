@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LI Lead Engine — Dom Orza</title>
+<style>
+  :root{
+    --blue:#0033A0; --blue-dark:#00256e; --blue-light:#e8eefb;
+    --ink:#1a2233; --muted:#5c6675; --line:#dde3ec; --bg:#f4f6fa; --card:#ffffff;
+    --green:#0e7c3f; --green-light:#e4f5ea; --amber:#b45309; --amber-light:#fdf0dd;
+    --red:#b91c1c; --red-light:#fdecec; --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{background:var(--blue);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:19px;font-weight:700;letter-spacing:.2px}
+  header .sub{font-size:12.5px;opacity:.85}
+  header .spacer{flex:1}
+  nav{display:flex;gap:4px;background:var(--blue-dark);padding:0 14px;flex-wrap:wrap}
+  nav button{background:none;border:none;color:#cdd8f2;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent}
+  nav button.active{color:#fff;border-bottom-color:#fff}
+  nav button:hover{color:#fff}
+  nav button .badge{background:#fff;color:var(--blue);border-radius:10px;padding:0 7px;font-size:11.5px;margin-left:6px}
+  main{max-width:1060px;margin:0 auto;padding:20px 16px 60px}
+  .panel{display:none}.panel.active{display:block}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px}
+  .toolbar label{font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px}
+  select,input[type=text],input[type=date],textarea{border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+  select:focus,input:focus,textarea:focus{outline:2px solid var(--blue);outline-offset:0}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn:hover{background:var(--blue-dark)}
+  .btn.secondary{background:#fff;color:var(--blue);border:1.5px solid var(--blue)}
+  .btn.secondary:hover{background:var(--blue-light)}
+  .btn.small{padding:5px 10px;font-size:12.5px}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--muted)}
+  .btn.ghost:hover{border-color:var(--muted)}
+  .lead-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+  .lead-main{flex:1;min-width:260px}
+  .lead-name{font-size:15.5px;font-weight:700}
+  .lead-addr{color:var(--muted);font-size:13.5px;margin-top:2px}
+  .lead-meta{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .chip{font-size:11.5px;font-weight:600;border-radius:20px;padding:2px 9px;background:var(--blue-light);color:var(--blue)}
+  .chip.hot{background:var(--red-light);color:var(--red)}
+  .chip.warm{background:var(--amber-light);color:var(--amber)}
+  .chip.new{background:var(--green-light);color:var(--green)}
+  .lead-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .lines-hint{font-size:12.5px;color:var(--green);font-weight:600;margin-top:4px}
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--radius);padding:34px;text-align:center;color:var(--muted)}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 18px;flex:1;min-width:120px;text-align:center}
+  .stat .num{font-size:24px;font-weight:800;color:var(--blue)}
+  .stat .lbl{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .pipe-card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--blue);border-radius:var(--radius);padding:13px 16px;margin-bottom:10px}
+  .pipe-card.status-Contacted{border-left-color:var(--amber)}
+  .pipe-card.status-Quoting{border-left-color:#7c3aed}
+  .pipe-card.status-Won{border-left-color:var(--green)}
+  .pipe-card.status-Lost{border-left-color:#9ca3af;opacity:.7}
+  .pipe-top{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+  .pipe-top .lead-main{flex:1}
+  .pipe-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .pipe-notes{width:100%;margin-top:8px;min-height:44px;resize:vertical}
+  .due{font-size:12.5px;font-weight:700;color:var(--red)}
+  .duefuture{font-size:12.5px;font-weight:600;color:var(--muted)}
+  .tmpl{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
+  .tmpl h3{font-size:15.5px;margin-bottom:4px}
+  .tmpl .use{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+  .tmpl pre{white-space:pre-wrap;font-family:inherit;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:12px;margin-bottom:10px}
+  .help{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 24px;margin-bottom:14px}
+  .help h2{font-size:17px;color:var(--blue);margin-bottom:8px}
+  .help h3{font-size:14.5px;margin:14px 0 4px}
+  .help p,.help li{font-size:14px;color:#333c4d;margin-bottom:6px}
+  .help ul,.help ol{padding-left:22px}
+  .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+  .settings-grid input{width:100%}
+  .loading{text-align:center;padding:30px;color:var(--muted)}
+  .spinner{display:inline-block;width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+  .note{font-size:12.5px;color:var(--muted);margin:6px 2px}
+  @media print{header,nav,.toolbar,.lead-actions,.btn{display:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛡️ LI Lead Engine</h1>
+  <span class="sub">New-business leads for Suffolk &amp; Nassau · built for Dom Orza, The Troiano Agency (Allstate), Smithtown NY</span>
+  <span class="spacer"></span>
+  <span class="sub" id="todayLabel"></span>
+</header>
+<nav>
+  <button class="active" data-tab="leads" onclick="showTab('leads')">🔎 Find Leads</button>
+  <button data-tab="pipeline" onclick="showTab('pipeline')">📋 My Pipeline <span class="badge" id="pipeCount">0</span></button>
+  <button data-tab="scripts" onclick="showTab('scripts')">✉️ Scripts &amp; Letters</button>
+  <button data-tab="help" onclick="showTab('help')">📖 How It Works</button>
+</nav>
+<main>
+
+<!-- ============ FIND LEADS ============ -->
+<div class="panel active" id="panel-leads">
+  <div class="toolbar">
+    <div><label>County</label>
+      <select id="fCounty">
+        <option value="both">Suffolk + Nassau</option>
+        <option value="Suffolk" selected>Suffolk only</option>
+        <option value="Nassau">Nassau only</option>
+      </select>
+    </div>
+    <div><label>Filed within</label>
+      <select id="fDays">
+        <option value="7">Last 7 days</option>
+        <option value="14" selected>Last 14 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="60">Last 60 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+    </div>
+    <div><label>Area</label>
+      <select id="fArea">
+        <option value="">Everywhere</option>
+        <option value="smithtown">Smithtown area (11787, 11780, 11767, 11754, 11725, 11788, 11733, 11720)</option>
+      </select>
+    </div>
+    <div><label>Town / ZIP contains</label>
+      <input type="text" id="fTown" placeholder="e.g. Huntington or 11743" size="16">
+    </div>
+    <div><label>Sort</label>
+      <select id="fSort">
+        <option value="priority" selected>Best prospects first</option>
+        <option value="date">Newest first</option>
+      </select>
+    </div>
+    <div style="align-self:flex-end"><button class="btn" onclick="fetchLeads()">Refresh Leads</button></div>
+    <div style="align-self:flex-end"><button class="btn secondary" onclick="exportLeadsCSV()">Export CSV (mailing list)</button></div>
+  </div>
+  <div class="stats" id="leadStats" style="display:none">
+    <div class="stat"><div class="num" id="stTotal">–</div><div class="lbl">New businesses</div></div>
+    <div class="stat"><div class="num" id="stHot">–</div><div class="lbl">High priority</div></div>
+    <div class="stat"><div class="num" id="stWeek">–</div><div class="lbl">Filed this week</div></div>
+  </div>
+  <div id="leadList"><div class="empty">Click <b>Refresh Leads</b> to pull the newest business filings in Suffolk &amp; Nassau County — live from the official NY Department of State registry (free, public data, updated daily).</div></div>
+</div>
+
+<!-- ============ PIPELINE ============ -->
+<div class="panel" id="panel-pipeline">
+  <div class="toolbar">
+    <div><label>Show</label>
+      <select id="pFilter" onchange="renderPipeline()">
+        <option value="active" selected>Active (New / Contacted / Quoting)</option>
+        <option value="all">All</option>
+        <option value="New">New</option>
+        <option value="Contacted">Contacted</option>
+        <option value="Quoting">Quoting</option>
+        <option value="Won">Won 🏆</option>
+        <option value="Lost">Lost</option>
+      </select>
+    </div>
+    <div style="align-self:flex-end"><button class="btn secondary" onclick="exportPipeCSV()">Export CSV</button></div>
+    <div style="align-self:flex-end"><button class="btn ghost small" onclick="addManualLead()">+ Add lead manually</button></div>
+  </div>
+  <div id="pipeList"></div>
+</div>
+
+<!-- ============ SCRIPTS ============ -->
+<div class="panel" id="panel-scripts">
+  <div class="help" style="margin-bottom:14px">
+    <h2>Your info (used to fill in the templates)</h2>
+    <div class="settings-grid">
+      <div><label>Your name</label><input type="text" id="setName" placeholder="Dom Orza"></div>
+      <div><label>Agency</label><input type="text" id="setAgency" placeholder="The Troiano Agency – Allstate"></div>
+      <div><label>Phone</label><input type="text" id="setPhone" placeholder="(631) 724-2100"></div>
+      <div><label>Email</label><input type="text" id="setEmail" placeholder="you@allstate.com"></div>
+    </div>
+    <button class="btn small" onclick="saveSettings()">Save</button>
+    <span class="note">Saved on this computer only.</span>
+  </div>
+  <div id="tmplList"></div>
+</div>
+
+<!-- ============ HELP ============ -->
+<div class="panel" id="panel-help">
+  <div class="help">
+    <h2>What this is</h2>
+    <p>Every new business in New York must file with the NY Department of State. Those filings are <b>public record</b>, published as free open data and updated daily. This tool pulls every brand-new LLC and corporation registered in <b>Suffolk and Nassau County</b> — often within a day or two of filing.</p>
+    <p><b>Why it matters:</b> a brand-new business needs insurance <i>right now</i> — general liability, a BOP, workers' comp, commercial auto — and most haven't picked an agent yet. You'll usually be the first agent to reach them, because you're seeing filings before they show up anywhere else.</p>
+    <h3>The 20-minute daily routine</h3>
+    <ol>
+      <li><b>Refresh Leads</b> each morning (Suffolk, last 7–14 days).</li>
+      <li>Scan the <b>high-priority</b> ones — contractors, trucking, restaurants, day cares, salons, landscapers. These have mandatory coverage needs (NY requires workers' comp &amp; disability the moment they hire anyone).</li>
+      <li>Click <b>🔍 Google</b> to find their phone/website, then <b>+ Pipeline</b> to track them.</li>
+      <li>Send the <b>congratulations letter</b> (Scripts tab) to 5–10 per day — the filing address is a valid mailing address. Or call the ones you can find numbers for.</li>
+      <li>Work the <b>Pipeline</b> tab: it sorts by follow-up date so nothing slips.</li>
+    </ol>
+    <h3>Why these leads are better than purchased leads</h3>
+    <ul>
+      <li><b>Free.</b> Internet lead vendors charge $20–$60+ per shared lead that 5 other agents also bought. These cost nothing and nobody else is systematically working them.</li>
+      <li><b>Timely.</b> You see the filing within days. The business owner is actively setting things up — bank account, EIN, insurance.</li>
+      <li><b>Commercial lines.</b> New-business policies (GL/BOP/WC/commercial auto) carry higher premiums than personal auto, renew annually, and open the door to the owner's home, auto, and life business later.</li>
+    </ul>
+    <h3>Compliance quick notes</h3>
+    <ul>
+      <li>This is all <b>public government data</b> — no scraping, no privacy issues.</li>
+      <li><b>Mail is always fine.</b> The congratulations letter is the safest and highest-converting first touch.</li>
+      <li><b>Calling a business</b> about business insurance is a business-to-business call; the federal Do-Not-Call registry covers residential/personal numbers, not B2B calls. Many of these addresses are home-based businesses — if a number appears personal, lead with mail instead. Follow Allstate's own telemarketing guidelines.</li>
+      <li><b>Don't text</b> prospects without prior consent.</li>
+    </ul>
+    <h3>Notes on the data</h3>
+    <ul>
+      <li>Source: NY Dept. of State "Active Corporations" dataset on data.ny.gov (official state open-data portal).</li>
+      <li>The address shown is the "process address" — where legal papers go. It's usually the owner's home or the business location; either way it's a valid mailing address.</li>
+      <li>Some filings list a registered-agent company (LegalZoom etc.) instead of the owner's address — those are marked and less useful for mail, but still worth a Google.</li>
+      <li>An internet connection is required to refresh leads. Your pipeline and notes are saved on this computer (they never leave it).</li>
+    </ul>
+  </div>
+</div>
+
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ================= state ================= */
+const LS_PIPE='liLeadEngine.pipeline', LS_SET='liLeadEngine.settings', LS_HIDE='liLeadEngine.hidden';
+let leads=[], pipeline=[], hidden={}, settings={};
+try{pipeline=JSON.parse(localStorage.getItem(LS_PIPE)||'[]')}catch(e){pipeline=[]}
+try{hidden=JSON.parse(localStorage.getItem(LS_HIDE)||'{}')}catch(e){hidden={}}
+try{settings=JSON.parse(localStorage.getItem(LS_SET)||'{}')}catch(e){settings={}}
+settings=Object.assign({name:'Dom Orza',agency:'The Troiano Agency – Allstate',phone:'(631) 724-2100',email:''},settings);
+
+const SMITHTOWN_ZIPS=['11787','11780','11767','11754','11725','11788','11733','11720'];
+
+/* keyword → [label, suggested lines, weight]  */
+const KEYWORDS=[
+ [/\b(construction|contracting|contractor|builders?|carpentry|roofing|siding|masonry|concrete|paving|drywall|framing|excavat|demolition|renovation|remodel)/i,'Contractor','Workers Comp · GL · Tools/Equipment · Commercial Auto',3],
+ [/\b(plumbing|hvac|heating|cooling|electric(al)?|mechanical|solar)/i,'Trades','Workers Comp · GL · Commercial Auto',3],
+ [/\b(landscap|lawn|tree (service|care)|irrigation|gardening|snow (removal|plow))/i,'Landscaping','GL · Commercial Auto · Workers Comp',3],
+ [/\b(trucking|logistics|freight|hauling|transport|delivery|moving|courier)/i,'Trucking/Logistics','Commercial Auto · Cargo · WC',3],
+ [/\b(restaurant|pizz|cafe|caffe|coffee|deli|bakery|catering|grill|kitchen|taqueria|sushi|bagel|diner|bbq|food)/i,'Restaurant/Food','BOP · WC · Liquor Liability',3],
+ [/\b(day ?care|child ?care|learning center|preschool)/i,'Day Care','GL · WC · Abuse/Molestation coverage',3],
+ [/\b(salon|barber|nails?|spa|beauty|lash|hair)/i,'Salon/Beauty','BOP · WC · Professional',2],
+ [/\b(cleaning|janitorial|maids?|housekeeping)/i,'Cleaning','GL · Bond · WC',2],
+ [/\b(auto (body|repair|glass)|collision|towing|tire|mechanic)/i,'Auto Services','Garage Liability · WC',3],
+ [/\b(home ?care|health ?care|nursing|medical|wellness|therapy|dental|pharmacy)/i,'Health Services','Professional · GL · WC',2],
+ [/\b(fitness|gym|crossfit|yoga|pilates|martial arts|training)/i,'Fitness','GL · Professional',2],
+ [/\b(security|protection|guard)/i,'Security','GL · WC',2],
+ [/\b(salvage|scrap|recycling|waste|junk)/i,'Waste/Recycling','GL · Commercial Auto · WC',2],
+ [/\b(realty|real estate|properties|property|holdings?|estates|homes|housing|apartments|rentals?)/i,'Real Estate/Landlord','Landlord Policy · Commercial Property · Umbrella',2],
+ [/\b(management|mgmt)/i,'Management Co','Commercial Package',1],
+ [/\b(salon|studio|photography|events?|entertainment|productions?|dj)\b/i,'Events/Studio','GL · BOP',1],
+ [/\b(store|shop|market|boutique|retail|trading|supply|distributors?)/i,'Retail','BOP · Product Liability',2],
+];
+function classify(name){
+  for(const [re,label,lines,w] of KEYWORDS){ if(re.test(name)) return {label,lines,weight:w}; }
+  return {label:'',lines:'',weight:0};
+}
+
+/* ================= tabs ================= */
+function showTab(t){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+t).classList.add('active');
+  document.querySelector('nav button[data-tab='+t+']').classList.add('active');
+  if(t==='pipeline') renderPipeline();
+  if(t==='scripts') renderTemplates();
+}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
+
+/* ================= fetch leads ================= */
+async function fetchLeads(){
+  const days=+document.getElementById('fDays').value;
+  const county=document.getElementById('fCounty').value;
+  const list=document.getElementById('leadList');
+  list.innerHTML='<div class="loading"><span class="spinner"></span>Pulling the latest filings from NY Dept. of State…</div>';
+  const since=new Date(Date.now()-days*864e5).toISOString().slice(0,10);
+  const cWhere = county==='both' ? "county in('Suffolk','Nassau')" : "county='"+county+"'";
+  const where = cWhere+" AND initial_dos_filing_date >= '"+since+"'";
+  const url="https://data.ny.gov/resource/n9v6-gdp6.json?$limit=2000&$order=initial_dos_filing_date DESC&$where="+encodeURIComponent(where);
+  try{
+    const res=await fetch(url);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows=await res.json();
+    leads=rows.map(r=>{
+      const name=r.current_entity_name||'';
+      const cls=classify(name);
+      const filed=(r.initial_dos_filing_date||'').slice(0,10);
+      const ageDays=Math.round((Date.now()-new Date(filed))/864e5);
+      const viaAgent=!!r.registered_agent_name && !r.dos_process_address_1;
+      return {
+        id:r.dos_id, name, filed, ageDays,
+        type:(r.entity_type||'').includes('LIMITED LIABILITY')?'LLC':'Corp',
+        county:r.county||'',
+        addr:[r.dos_process_address_1,r.dos_process_address_2].filter(Boolean).join(', '),
+        city:r.dos_process_city||'', state:r.dos_process_state||'NY', zip:(r.dos_process_zip||'').slice(0,5),
+        cls, viaAgent,
+        score: cls.weight*10 + Math.max(0,14-ageDays)
+      };
+    });
+    renderLeads();
+  }catch(err){
+    list.innerHTML='<div class="empty">⚠️ Could not reach data.ny.gov — check your internet connection and try again.<br><span class="note">('+err.message+')</span></div>';
+  }
+}
+function filteredLeads(){
+  const town=document.getElementById('fTown').value.trim().toLowerCase();
+  const area=document.getElementById('fArea').value;
+  let out=leads.filter(l=>!hidden[l.id]);
+  if(area==='smithtown') out=out.filter(l=>SMITHTOWN_ZIPS.includes(l.zip));
+  if(town) out=out.filter(l=>l.city.toLowerCase().includes(town)||l.zip.startsWith(town));
+  const sort=document.getElementById('fSort').value;
+  out.sort(sort==='date' ? (a,b)=>b.filed.localeCompare(a.filed) : (a,b)=>b.score-a.score||b.filed.localeCompare(a.filed));
+  return out;
+}
+function renderLeads(){
+  const out=filteredLeads();
+  const list=document.getElementById('leadList');
+  document.getElementById('leadStats').style.display='flex';
+  document.getElementById('stTotal').textContent=out.length;
+  document.getElementById('stHot').textContent=out.filter(l=>l.cls.weight>=3).length;
+  document.getElementById('stWeek').textContent=out.filter(l=>l.ageDays<=7).length;
+  if(!out.length){list.innerHTML='<div class="empty">No filings match these filters. Widen the date range or clear the town filter.</div>';return}
+  const inPipe=new Set(pipeline.map(p=>p.id));
+  list.innerHTML=out.slice(0,400).map(l=>{
+    const g='https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+l.city+' NY');
+    const m='https://www.google.com/maps/search/'+encodeURIComponent(l.addr+', '+l.city+' NY '+l.zip);
+    const prio=l.cls.weight>=3?'<span class="chip hot">🔥 High priority</span>':l.cls.weight===2?'<span class="chip warm">Warm</span>':'';
+    const fresh=l.ageDays<=7?'<span class="chip new">Filed '+(l.ageDays<=1?'today/yesterday':l.ageDays+' days ago')+'</span>':'';
+    return '<div class="lead-card">'+
+      '<div class="lead-main">'+
+        '<div class="lead-name">'+esc(l.name)+'</div>'+
+        '<div class="lead-addr">'+esc(l.addr? l.addr+', ':'')+esc(l.city)+', NY '+esc(l.zip)+' · '+esc(l.county)+' County'+(l.viaAgent?' · <i>via registered agent</i>':'')+'</div>'+
+        (l.cls.lines?'<div class="lines-hint">→ Likely needs: '+l.cls.lines+'</div>':'')+
+        '<div class="lead-meta">'+prio+fresh+
+          '<span class="chip">'+l.type+'</span>'+
+          (l.cls.label?'<span class="chip">'+l.cls.label+'</span>':'')+
+          '<span class="chip">Filed '+l.filed+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="lead-actions">'+
+        '<a class="btn small secondary" target="_blank" href="'+g+'">🔍 Google</a>'+
+        '<a class="btn small secondary" target="_blank" href="'+m+'">🗺️ Map</a>'+
+        (inPipe.has(l.id)?'<span class="chip new">✓ In pipeline</span>':'<button class="btn small" onclick="addToPipe(\''+l.id+'\')">+ Pipeline</button>')+
+        '<button class="btn small ghost" onclick="hideLead(\''+l.id+'\')" title="Hide this lead">✕</button>'+
+      '</div>'+
+    '</div>';
+  }).join('') + (out.length>400?'<div class="note">Showing first 400 of '+out.length+'.</div>':'');
+}
+['fTown','fArea','fSort'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(leads.length)renderLeads()}));
+function hideLead(id){hidden[id]=1;localStorage.setItem(LS_HIDE,JSON.stringify(hidden));renderLeads()}
+
+/* ================= pipeline ================= */
+function addToPipe(id){
+  const l=leads.find(x=>x.id===id); if(!l||pipeline.some(p=>p.id===id))return;
+  pipeline.unshift({id:l.id,name:l.name,addr:l.addr,city:l.city,zip:l.zip,county:l.county,filed:l.filed,lines:l.cls.lines,label:l.cls.label,
+    status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10)});
+  savePipe();renderLeads();toast('Added to pipeline — set a follow-up date in the Pipeline tab');
+}
+function addManualLead(){
+  const name=prompt('Business / prospect name:'); if(!name)return;
+  pipeline.unshift({id:'man'+Date.now(),name,addr:'',city:'',zip:'',county:'',filed:'',lines:'',label:'Manual',
+    status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10)});
+  savePipe();renderPipeline();
+}
+function savePipe(){localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));document.getElementById('pipeCount').textContent=pipeline.filter(p=>['New','Contacted','Quoting'].includes(p.status)).length}
+function renderPipeline(){
+  savePipe();
+  const f=document.getElementById('pFilter').value;
+  let items=pipeline.filter(p=> f==='all'?true : f==='active'?['New','Contacted','Quoting'].includes(p.status) : p.status===f);
+  const today=new Date().toISOString().slice(0,10);
+  items.sort((a,b)=>(a.followUp||'9999').localeCompare(b.followUp||'9999'));
+  const el=document.getElementById('pipeList');
+  if(!items.length){el.innerHTML='<div class="empty">Nothing here yet. Add prospects from the <b>Find Leads</b> tab.</div>';return}
+  el.innerHTML=items.map(p=>{
+    const overdue=p.followUp&&p.followUp<=today&&['New','Contacted','Quoting'].includes(p.status);
+    const g='https://www.google.com/search?q='+encodeURIComponent('"'+p.name+'" '+p.city+' NY');
+    return '<div class="pipe-card status-'+p.status+'">'+
+      '<div class="pipe-top">'+
+        '<div class="lead-main">'+
+          '<div class="lead-name">'+esc(p.name)+'</div>'+
+          '<div class="lead-addr">'+esc(p.addr?p.addr+', ':'')+esc(p.city)+(p.zip?', NY '+esc(p.zip):'')+(p.filed?' · filed '+p.filed:'')+'</div>'+
+          (p.lines?'<div class="lines-hint">→ '+p.lines+'</div>':'')+
+        '</div>'+
+        '<div class="pipe-controls">'+
+          (overdue?'<span class="due">⏰ Follow up due!</span>':'')+
+          '<select onchange="setStatus(\''+p.id+'\',this.value)">'+
+            ['New','Contacted','Quoting','Won','Lost'].map(s=>'<option'+(p.status===s?' selected':'')+'>'+s+'</option>').join('')+
+          '</select>'+
+          '<label class="note">Follow-up:</label><input type="date" value="'+(p.followUp||'')+'" onchange="setFollow(\''+p.id+'\',this.value)">'+
+          '<a class="btn small secondary" target="_blank" href="'+g+'">🔍</a>'+
+          '<button class="btn small ghost" onclick="delPipe(\''+p.id+'\')">🗑</button>'+
+        '</div>'+
+      '</div>'+
+      '<textarea class="pipe-notes" placeholder="Notes — who you spoke to, quotes given, current carrier, x-date…" onchange="setNotes(\''+p.id+'\',this.value)">'+esc(p.notes||'')+'</textarea>'+
+    '</div>';
+  }).join('');
+}
+function setStatus(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.status=v;savePipe();renderPipeline();if(v==='Won')toast('🏆 Nice one!')}}
+function setFollow(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.followUp=v;savePipe();renderPipeline()}}
+function setNotes(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.notes=v;savePipe()}}
+function delPipe(id){if(!confirm('Remove this prospect from your pipeline?'))return;pipeline=pipeline.filter(x=>x.id!==id);savePipe();renderPipeline()}
+
+/* ================= CSV export ================= */
+function csvEscape(v){v=String(v==null?'':v);return '"'+v.replace(/"/g,'""')+'"'}
+function downloadCSV(rows,fname){
+  const csv=rows.map(r=>r.map(csvEscape).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));
+  a.download=fname;a.click();URL.revokeObjectURL(a.href);
+}
+function exportLeadsCSV(){
+  const out=filteredLeads();
+  if(!out.length){toast('Refresh leads first');return}
+  downloadCSV([['Business Name','Address','City','State','ZIP','County','Entity Type','Filed','Category','Suggested Lines']]
+    .concat(out.map(l=>[l.name,l.addr,l.city,'NY',l.zip,l.county,l.type,l.filed,l.cls.label,l.cls.lines])),'new-business-leads-'+new Date().toISOString().slice(0,10)+'.csv');
+  toast('CSV downloaded — ready for a mail merge');
+}
+function exportPipeCSV(){
+  if(!pipeline.length){toast('Pipeline is empty');return}
+  downloadCSV([['Business Name','Status','Follow-up','Address','City','ZIP','Filed','Suggested Lines','Notes','Added']]
+    .concat(pipeline.map(p=>[p.name,p.status,p.followUp,p.addr,p.city,p.zip,p.filed,p.lines,p.notes,p.added])),'pipeline-'+new Date().toISOString().slice(0,10)+'.csv');
+}
+
+/* ================= templates ================= */
+const TEMPLATES=[
+ {t:'New-business congratulations letter (mail this — highest converting first touch)',
+  u:'Print on agency letterhead and mail to the filing address within 2 weeks of the filing date.',
+  b:`Dear {BUSINESS} team,
+
+Congratulations on registering {BUSINESS}! Starting a business on Long Island takes real guts, and I wanted to be one of the first to wish you success.
+
+My name is {AGENT} and I work right here in Smithtown at {AGENCY}. I specialize in helping new Long Island businesses get set up with the right protection from day one — general liability, business owners policies, commercial auto, and the workers' compensation and disability coverage New York requires as soon as you bring on your first employee.
+
+A quick 10-minute call is usually all it takes to find out what you actually need now (and what can wait). No pressure, no obligation — just straight answers from a local agent.
+
+Call or text me at {PHONE}, or stop by our office at 25 Manor Rd in Smithtown.
+
+Wishing you a great launch,
+
+{AGENT}
+{AGENCY}
+{PHONE}  ·  {EMAIL}`},
+ {t:'Cold-call opener (new business)',
+  u:'For prospects you found a phone number for. Best within 30 days of their filing.',
+  b:`"Hi, this is {AGENT} from {AGENCY} here in Smithtown — congratulations on the new business! I work with a lot of new companies in Suffolk County, and the reason for my quick call is that New York has a couple of insurance requirements that catch new owners off guard — workers' comp and disability the moment you hire anyone, and most commercial leases and contracts require liability coverage before you can sign.
+
+Do you have a minute for me to ask what stage you're at, so I can tell you what actually applies to you? ... Worst case you leave with a checklist, best case I save you some money."
+
+[If busy]: "Totally understand — when's a better 10 minutes this week?"`},
+ {t:'Email / contact-form follow-up',
+  u:'When their website has a contact form or you found an email.',
+  b:`Subject: Congrats on {BUSINESS} — quick NY insurance checklist
+
+Hi,
+
+Congratulations on launching {BUSINESS}! I'm {AGENT}, a commercial insurance agent with {AGENCY} in Smithtown.
+
+New NY businesses have a few coverage requirements that are easy to miss:
+  • Workers' comp + NY disability — required the day you hire your first employee
+  • General liability — required by most leases, landlords, and contracts
+  • Commercial auto — personal auto policies exclude business use
+
+Happy to do a free 10-minute review so you know exactly what applies to you and what it should cost. No obligation.
+
+{AGENT}
+{AGENCY} · {PHONE} · {EMAIL}`},
+ {t:'X-date follow-up (existing business, renewal ask)',
+  u:'For businesses that already have coverage — get the renewal date and call back 60 days before.',
+  b:`"That makes sense — most businesses are set up already. Can I ask just one thing? When does your current policy renew?
+
+The reason I ask: about 60 days before renewal is the one window each year when it's worth getting a second set of eyes on it. Rates on Long Island have moved a lot, and I regularly find new businesses over- or under-covered. If I take a look then, worst case I confirm you've got a good deal.
+
+Who are you with now, and roughly when does it renew? ... Great — I'll reach out around [DATE]. What's the best way to reach you then?"
+
+→ Log the x-date in the Pipeline notes and set the follow-up date ~60 days before renewal.`},
+];
+function fill(s){return s.replace(/{AGENT}/g,settings.name||'—').replace(/{AGENCY}/g,settings.agency||'—').replace(/{PHONE}/g,settings.phone||'—').replace(/{EMAIL}/g,settings.email||'—').replace(/{BUSINESS}/g,'[Business Name]')}
+function renderTemplates(){
+  document.getElementById('setName').value=settings.name;document.getElementById('setAgency').value=settings.agency;
+  document.getElementById('setPhone').value=settings.phone;document.getElementById('setEmail').value=settings.email;
+  document.getElementById('tmplList').innerHTML=TEMPLATES.map((x,i)=>'<div class="tmpl"><h3>'+x.t+'</h3><div class="use">'+x.u+'</div><pre id="tm'+i+'">'+esc(fill(x.b))+'</pre><button class="btn small secondary" onclick="copyTmpl('+i+')">📋 Copy to clipboard</button></div>').join('');
+}
+function copyTmpl(i){
+  const txt=document.getElementById('tm'+i).textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Copied — replace [Business Name] with the prospect'),()=>{
+    const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Copied');
+  });
+}
+function saveSettings(){
+  settings.name=document.getElementById('setName').value;settings.agency=document.getElementById('setAgency').value;
+  settings.phone=document.getElementById('setPhone').value;settings.email=document.getElementById('setEmail').value;
+  localStorage.setItem(LS_SET,JSON.stringify(settings));renderTemplates();toast('Saved');
+}
+
+/* ================= util ================= */
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+document.getElementById('todayLabel').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+savePipe();
+</script>
+</body>
+</html>

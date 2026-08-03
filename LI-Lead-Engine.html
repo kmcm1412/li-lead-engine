@@ -361,13 +361,21 @@
     <button class="btn small" onclick="saveSettings()">Save</button>
     <span class="note">Saved on this computer only.</span>
     <div id="syncBox" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
-      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">🔄 Sync your pipeline across devices</label>
-      <span id="syncControls">
-        <input type="text" id="setSync" placeholder="Make up a sync code, e.g. dom-troiano-8817" size="30">
-        <button class="btn small" onclick="saveSync()">Enable sync</button>
-      </span>
+      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">🔐 Your account — one login syncs everything, everywhere</label>
+      <div id="authedRow" style="display:none">
+        <span class="chip new" style="font-size:13px">✓ Signed in as <b id="authEmail"></b></span>
+        <button class="btn small ghost" onclick="doSignOut()" style="margin-left:8px">Sign out</button>
+        <div class="note">Your pipeline, notes, follow-ups, and quote requests follow you to any device — just sign in with this same login.</div>
+      </div>
+      <div id="loginRow" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="email" id="aEmail" placeholder="Email" size="20" autocomplete="username" onkeydown="if(event.key==='Enter')doSignIn()">
+        <input type="password" id="aPass" placeholder="Password" size="13" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()">
+        <button class="btn small" onclick="doSignIn()">Sign in</button>
+        <button class="btn small secondary" onclick="doSignUp()">Create account</button>
+        <button class="btn small ghost" onclick="doReset()">Forgot password?</button>
+      </div>
       <span class="note" id="syncStatus"></span>
-      <div class="note">Enter the <b>same code</b> on your phone and office computer and your pipeline, notes, and follow-ups stay in sync everywhere. Pick something long and unguessable — the code is the key to your list.</div>
+      <div class="note" id="syncHint">First time: click <b>Create account</b> with any email + a password (6+ characters). Then sign in with the same login on your phone and office computer — everything stays in sync.</div>
     </div>
   </div>
   <div id="tmplList"></div>
@@ -422,7 +430,7 @@
       <li>Source: NY Dept. of State "Active Corporations" dataset on data.ny.gov (official state open-data portal).</li>
       <li>The address shown is the "process address" — where legal papers go. It's usually the owner's home or the business location; either way it's a valid mailing address.</li>
       <li>Some filings list a registered-agent company (LegalZoom etc.) instead of the owner's address — those are marked and less useful for mail, but still worth a Google.</li>
-      <li>An internet connection is required to refresh leads. Your pipeline and notes are saved on this device — and if you set a <b>sync code</b> (Scripts &amp; Letters tab), they also sync privately across your phone and computer.</li>
+      <li>An internet connection is required to refresh leads. Create your <b>login</b> (Scripts &amp; Letters tab) and your pipeline, notes, and quote requests sync privately across every device you sign in on — protected by your password.</li>
       <li>📬 A fresh <a href="digest.html">daily lead digest</a> is posted every weekday morning — and can be emailed to you automatically.</li>
     </ul>
   </div>
@@ -1277,9 +1285,9 @@ function openFlyer(){window.open('flyer.html?c='+encodeURIComponent(settings.inb
 async function fetchInbox(force){
   const card=document.getElementById('inboxCard'); if(!card)return;
   if(!SYNC){card.style.display='none';return}
-  if(!settings.syncCode){
-    document.getElementById('inboxList').innerHTML='<span class="note">⚠️ <b>One-time step:</b> set your <b>sync code</b> in ✉️ Scripts &amp; Letters first (enter the <b>same code</b> on your phone and computer). That links your devices so quote requests show up everywhere — your shareable form link will appear right here once it’s set.</span>';
-    document.getElementById('qlink').textContent='(appears after you set your sync code)';
+  if(!syncEnabled()){
+    document.getElementById('inboxList').innerHTML='<span class="note">⚠️ <b>One-time step:</b> create your login in <b>✉️ Scripts &amp; Letters</b> (any email + a password, 10 seconds). Then sign in on your phone too and quote requests show up everywhere — your shareable form link appears right here once you’re signed in.</span>';
+    document.getElementById('qlink').textContent='(appears after you sign in)';
     return;
   }
   if(!firstPullDone){document.getElementById('inboxList').innerHTML='<span class="note">Connecting to your synced inbox…</span>';return}
@@ -1344,11 +1352,51 @@ function inboxAdd(ts){
 }
 function inboxRemove(ts){inboxItems=inboxItems.filter(x=>x.ts!==ts);inboxWrite()}
 
-/* ================= cloud sync (optional, Firestore REST) ================= */
+/* ================= cloud sync + account (Firestore REST + Firebase Auth REST) ================= */
 const SYNC=(window.SYNC_CONFIG&&window.SYNC_CONFIG.projectId&&window.SYNC_CONFIG.apiKey)?window.SYNC_CONFIG:null;
 let syncTimer=null,syncBusy=false;
-function syncEnabled(){return !!(SYNC&&settings.syncCode)}
-function fsUrl(){return 'https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/pipelines/'+encodeURIComponent(settings.syncCode)+'?key='+SYNC.apiKey}
+let AUTH=null; try{AUTH=JSON.parse(localStorage.getItem('liLeadEngine.auth')||'null')}catch(e){AUTH=null}
+let idToken=null,idTokenExp=0;
+function authed(){return !!(SYNC&&AUTH&&AUTH.refreshToken)}
+function saveAuth(){localStorage.setItem('liLeadEngine.auth',JSON.stringify(AUTH))}
+async function getToken(){
+  if(!authed())return null;
+  if(idToken&&Date.now()<idTokenExp-60e3)return idToken;
+  const r=await fetch('https://securetoken.googleapis.com/v1/token?key='+SYNC.apiKey,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(AUTH.refreshToken)});
+  if(!r.ok){if(r.status===400){doSignOut();setSyncStatus('Session expired — please sign in again',true)}throw new Error('token '+r.status)}
+  const d=await r.json();
+  idToken=d.id_token;idTokenExp=Date.now()+((+d.expires_in||3600)*1000);
+  if(d.refresh_token&&d.refresh_token!==AUTH.refreshToken){AUTH.refreshToken=d.refresh_token;saveAuth()}
+  return idToken;
+}
+async function authCall(kind,email,pass){
+  const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:'+kind+'?key='+SYNC.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass,returnSecureToken:true})});
+  const d=await r.json();
+  if(!r.ok)throw new Error((d.error&&d.error.message)||'AUTH_ERROR');
+  AUTH={refreshToken:d.refreshToken,uid:d.localId,email:d.email};saveAuth();
+  idToken=d.idToken;idTokenExp=Date.now()+3500e3;
+}
+function authErr(m){
+  if(/EMAIL_EXISTS/.test(m))return 'That email already has an account — use Sign in.';
+  if(/WEAK_PASSWORD/.test(m))return 'Password needs at least 6 characters.';
+  if(/EMAIL_NOT_FOUND/.test(m))return 'No account with that email — click Create account.';
+  if(/INVALID_PASSWORD|INVALID_LOGIN_CREDENTIALS/.test(m))return 'Wrong email or password. Try again or click Forgot password.';
+  if(/INVALID_EMAIL/.test(m))return 'That doesn’t look like an email address.';
+  if(/TOO_MANY_ATTEMPTS/.test(m))return 'Too many tries — wait a minute and try again.';
+  return 'Sign-in problem: '+m;
+}
+function syncEnabled(){return !!(SYNC&&(authed()||settings.syncCode))}
+function fsUrl(){
+  return authed()
+    ? 'https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/users/'+AUTH.uid+'?key='+SYNC.apiKey
+    : 'https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/pipelines/'+encodeURIComponent(settings.syncCode)+'?key='+SYNC.apiKey;
+}
+async function fsFetch(opts){
+  const o=Object.assign({},opts||{});
+  o.headers=Object.assign({},o.headers||{});
+  if(authed())o.headers['Authorization']='Bearer '+await getToken();
+  return fetch(fsUrl(),o);
+}
 function setSyncStatus(msg,bad){const el=document.getElementById('syncStatus');if(el){el.textContent=msg;el.style.color=bad?'var(--red)':'var(--green)'}}
 function mergeRemote(remote){
   const map=new Map(pipeline.map(p=>[p.id,p]));
@@ -1361,7 +1409,7 @@ async function pullCloud(push){
   if(!syncEnabled()||syncBusy)return;
   syncBusy=true;
   try{
-    const r=await fetch(fsUrl());
+    const r=await fsFetch();
     let remote=[];
     if(r.status===404){remote=[]}
     else if(r.ok){const d=await r.json();try{remote=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}catch(e){remote=[]}
@@ -1377,7 +1425,7 @@ async function pullCloud(push){
     if(push!==false){
       const body={fields:{data:{stringValue:JSON.stringify(pipeline)},updated:{integerValue:String(Date.now())}}};
       if(settings.inboxCode)body.fields.inbox={stringValue:settings.inboxCode};
-      const w=await fetch(fsUrl(),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const w=await fsFetch({method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(!w.ok)throw new Error('HTTP '+w.status);
     }
     setSyncStatus('✓ Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
@@ -1386,17 +1434,54 @@ async function pullCloud(push){
   finally{syncBusy=false}
 }
 function schedulePush(){if(!syncEnabled())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>pullCloud(true),1500)}
-function saveSync(){
-  const code=document.getElementById('setSync').value.trim();
-  settings.syncCode=code;localStorage.setItem(LS_SET,JSON.stringify(settings));
-  if(syncEnabled()){setSyncStatus('Connecting…');pullCloud(true)}
-  else setSyncStatus(code?'Sync is not configured on this site yet':'Enter a code to enable sync',true);
+async function doSignIn(){doAuth('signInWithPassword')}
+async function doSignUp(){doAuth('signUp')}
+async function doAuth(kind){
+  const email=document.getElementById('aEmail').value.trim(),pass=document.getElementById('aPass').value;
+  if(!email||!pass){setSyncStatus('Enter your email and a password first',true);return}
+  setSyncStatus('Working…');
+  try{
+    await authCall(kind,email,pass);
+    if(settings.syncCode){
+      try{
+        const legacy='https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/pipelines/'+encodeURIComponent(settings.syncCode)+'?key='+SYNC.apiKey;
+        const r=await fetch(legacy);
+        if(r.ok){const d=await r.json();let rem=[];try{rem=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}catch(e){rem=[]}
+          mergeRemote(rem);
+          const ri=d.fields&&d.fields.inbox&&d.fields.inbox.stringValue;
+          if(ri&&!settings.inboxCode)settings.inboxCode=ri;
+        }
+      }catch(e){}
+      settings.syncCode='';
+      localStorage.setItem(LS_SET,JSON.stringify(settings));
+    }
+    document.getElementById('aPass').value='';
+    firstPullDone=false;lastInboxFetch=0;
+    initSyncUI();
+    await pullCloud(true);
+    fetchInbox(true);
+    toast(kind==='signUp'?'Account created ✓ — sign in with this same login on your other devices':'Signed in ✓');
+  }catch(e){setSyncStatus(authErr(e.message),true)}
 }
+async function doReset(){
+  const email=document.getElementById('aEmail').value.trim();
+  if(!email){setSyncStatus('Type your email first, then click Forgot password',true);return}
+  try{
+    const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key='+SYNC.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestType:'PASSWORD_RESET',email:email})});
+    if(!r.ok)throw new Error((await r.json()).error.message||'');
+    setSyncStatus('Reset email sent to '+email+' — check the inbox (and spam).');
+  }catch(e){setSyncStatus(authErr(e.message),true)}
+}
+function doSignOut(){AUTH=null;idToken=null;localStorage.removeItem('liLeadEngine.auth');initSyncUI();setSyncStatus('Signed out — this device keeps a local copy')}
 function initSyncUI(){
-  const box=document.getElementById('syncBox');
-  if(!SYNC){box.querySelector('#syncControls').style.display='none';box.querySelector('.note:last-child').textContent='Cloud sync is not switched on for this site yet — your pipeline is saved on this device only.';return}
-  document.getElementById('setSync').value=settings.syncCode||'';
-  if(syncEnabled())pullCloud(false);
+  const box=document.getElementById('syncBox'); if(!box)return;
+  if(!SYNC){box.style.display='none';return}
+  const on=authed();
+  document.getElementById('authedRow').style.display=on?'':'none';
+  document.getElementById('loginRow').style.display=on?'none':'flex';
+  document.getElementById('syncHint').style.display=on?'none':'';
+  if(on){document.getElementById('authEmail').textContent=AUTH.email||'';pullCloud(false)}
+  else if(settings.syncCode){setSyncStatus('Old sync-code link still active — create a login above and your data moves over automatically.');pullCloud(false)}
 }
 if(SYNC){setInterval(()=>pullCloud(false),90e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pullCloud(false)})}
 

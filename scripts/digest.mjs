@@ -59,6 +59,44 @@ for (const [id, d] of Object.entries(seen)) if (d < cutoff) delete seen[id];
 mkdirSync('data', { recursive: true });
 writeFileSync(SEEN_PATH, JSON.stringify(seen));
 
+// ---- new homeowners (Queens deed registry; posts in batches, often empty day-to-day) ----
+const ENTITY_RE = /\b(LLC|L\.L\.C|CORP|INC|LTD|TRUST|TRUSTEE|HOLDINGS?|PARTNERS?|LP|REALTY|GROUP|FUND|EQUITIES|ASSOCIATES|DEVELOPMENT|VENTURES|PROPERTIES|CAPITAL|HDFC|CITY OF|BANK|ESTATES? OF)\b/i;
+const PTYPE = { D1: '1-family', D2: '2-family', D3: '3-family', D4: '4-family', SC: 'Condo', MC: 'Condos', SP: 'Co-op', MP: 'Co-ops', RP: '1-2 family', RG: '1-2 family', RV: '1-2 family' };
+const personName = n => String(n).split(',').length === 2 && !ENTITY_RE.test(n) ? n.split(',')[1].trim() + ' ' + n.split(',')[0].trim() : n;
+const tc = s => String(s).toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+let homes = [];
+try {
+  const mUrl = 'https://data.cityofnewyork.us/resource/bnx9-e6tj.json?$limit=300&$order=recorded_datetime DESC&$where=' + encodeURIComponent("doc_type='DEED' AND recorded_borough='4' AND document_amt >= 100000");
+  const master = (await (await fetch(mUrl)).json()).filter(r => !seen['H' + r.document_id]);
+  const ids = master.map(r => r.document_id);
+  const legals = {}, buyers = {};
+  for (let i = 0; i < ids.length; i += 80) {
+    const inList = "('" + ids.slice(i, i + 80).join("','") + "')";
+    const [lg, pt] = await Promise.all([
+      fetch('https://data.cityofnewyork.us/resource/8h5j-fqxa.json?$limit=1000&$where=' + encodeURIComponent('document_id in' + inList)).then(r => r.json()),
+      fetch('https://data.cityofnewyork.us/resource/636b-3b5g.json?$limit=1000&$where=' + encodeURIComponent("document_id in" + inList + " AND party_type='2'")).then(r => r.json()),
+    ]);
+    for (const l of lg) if (!legals[l.document_id]) legals[l.document_id] = l;
+    for (const p of pt) (buyers[p.document_id] = buyers[p.document_id] || []).push(p);
+  }
+  homes = master.map(r => {
+    const lg = legals[r.document_id], bs = buyers[r.document_id] || [];
+    if (!lg || !PTYPE[lg.property_type] || !bs.length) return null;
+    const names = bs.map(b => b.name).filter(Boolean);
+    if (names.some(n => ENTITY_RE.test(n))) return null; // individuals only for the digest
+    return {
+      id: r.document_id,
+      name: tc(names.slice(0, 2).map(personName).join(' & ')),
+      prop: [lg.street_number, lg.street_name].filter(Boolean).join(' '),
+      ptype: PTYPE[lg.property_type],
+      price: +r.document_amt || 0,
+      recorded: (r.recorded_datetime || '').slice(0, 10),
+    };
+  }).filter(Boolean);
+  for (const r of master) seen['H' + r.document_id] = today;
+  writeFileSync(SEEN_PATH, JSON.stringify(seen));
+} catch (e) { console.log('homeowner feed skipped: ' + e.message); }
+
 // ---- render ----
 const hot = fresh.filter(l => l.cls.weight >= 3);
 const rest = fresh.filter(l => l.cls.weight < 3);
@@ -78,11 +116,17 @@ const html = `<!DOCTYPE html>
 <body style="margin:0;font-family:'Segoe UI',system-ui,Arial,sans-serif;background:#f4f6fa;color:#1a2233">
 <div style="max-width:680px;margin:0 auto;padding:20px 14px">
   <div style="background:#0033A0;color:#fff;border-radius:10px;padding:18px 22px;margin-bottom:16px">
-    <div style="font-size:20px;font-weight:700">🛡️ New Business Leads — Long Island</div>
-    <div style="font-size:13.5px;opacity:.85">${dateLabel} · ${fresh.length} new since the last digest (${hot.length} high-priority) · Suffolk &amp; Nassau</div>
+    <div style="font-size:20px;font-weight:700">🛡️ LeadEngine LI — Daily Digest</div>
+    <div style="font-size:13.5px;opacity:.85">${dateLabel} · ${homes.length} new homeowners (Queens) · ${fresh.length} new businesses, ${hot.length} high-priority (Suffolk &amp; Nassau)</div>
   </div>
-  ${fresh.length === 0 ? '<p style="text-align:center;color:#5c6675;padding:30px">No new filings since the last digest. Check back tomorrow.</p>' : ''}
-  ${hot.length ? `<h2 style="font-size:16px;color:#b91c1c">🔥 High priority (${hot.length})</h2>` + hot.map(card).join('') : ''}
+  ${fresh.length === 0 && homes.length === 0 ? '<p style="text-align:center;color:#5c6675;padding:30px">No new filings since the last digest. Check back tomorrow.</p>' : ''}
+  ${homes.length ? `<h2 style="font-size:16px;color:#0c7a3e">🏠 New homeowners — Queens (${homes.length}, individual buyers)</h2>` + homes.slice(0, 60).map(h => `
+  <div style="background:#fff;border:1px solid #dde3ec;border-left:5px solid #0c7a3e;border-radius:8px;padding:12px 16px;margin-bottom:8px">
+    <div style="font-weight:700;font-size:15px">${esc(h.name)}</div>
+    <div style="color:#5c6675;font-size:13px">${esc(h.prop)}, Queens, NY · ${h.ptype} · $${h.price.toLocaleString('en-US')} · recorded ${h.recorded}</div>
+    <div style="color:#0e7c3f;font-size:13px;font-weight:600">→ Quote: Homeowners + Auto bundle</div>
+  </div>`).join('') + (homes.length > 60 ? `<p style="color:#5c6675;font-size:13px">…and ${homes.length - 60} more in the app.</p>` : '') : ''}
+  ${hot.length ? `<h2 style="font-size:16px;color:#b91c1c">🔥 High-priority new businesses (${hot.length})</h2>` + hot.map(card).join('') : ''}
   ${rest.length ? `<h2 style="font-size:16px;color:#0033A0;margin-top:18px">Everything else (${rest.length})</h2>` + rest.slice(0, 150).map(card).join('') + (rest.length > 150 ? `<p style="color:#5c6675;font-size:13px">…and ${rest.length - 150} more in the app.</p>` : '') : ''}
   <div style="text-align:center;margin:22px 0">
     <a href="${APP_URL}" style="background:#0033A0;color:#fff;text-decoration:none;padding:12px 26px;border-radius:8px;font-weight:700;display:inline-block">Open the Lead Engine →</a>
@@ -92,12 +136,12 @@ const html = `<!DOCTYPE html>
 </body></html>`;
 
 writeFileSync('digest.html', html);
-console.log(`digest.html written: ${fresh.length} new leads (${hot.length} high-priority)`);
+console.log(`digest.html written: ${homes.length} homeowner leads, ${fresh.length} business leads (${hot.length} high-priority)`);
 
 // ---- email (optional) ----
 const { GMAIL_USER, GMAIL_APP_PASSWORD, DIGEST_TO } = process.env;
 if (GMAIL_USER && GMAIL_APP_PASSWORD) {
-  if (fresh.length === 0) { console.log('No new leads — skipping email.'); process.exit(0); }
+  if (fresh.length === 0 && homes.length === 0) { console.log('No new leads — skipping email.'); process.exit(0); }
   const nodemailer = (await import('nodemailer')).default;
   const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com', port: 465, secure: true,
@@ -106,7 +150,7 @@ if (GMAIL_USER && GMAIL_APP_PASSWORD) {
   await transporter.sendMail({
     from: `"LI Lead Engine" <${GMAIL_USER}>`,
     to: DIGEST_TO || GMAIL_USER,
-    subject: `🛡️ ${fresh.length} new LI business leads (${hot.length} hot) — ${dateLabel}`,
+    subject: `🛡️ ${homes.length ? homes.length + ' new homeowners + ' : ''}${fresh.length} new business leads — ${dateLabel}`,
     html,
   });
   console.log('Email sent to ' + (DIGEST_TO || GMAIL_USER));

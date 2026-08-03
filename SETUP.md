@@ -2,7 +2,15 @@
 
 ✅ **Cross-device sync: DONE (Aug 3, 2026).** Firebase project `li-lead-engine` created (free Spark plan), Firestore live with rules restricting access to `/pipelines/*`, config deployed in `sync-config.js`, verified end-to-end. Dom just makes up a sync code in **Scripts & Letters** and enters it on each device — nothing else needed.
 
-⬜ **Email digest: one step left (yours — ~3 min).** The digest page already publishes daily; email delivery needs the Gmail secrets below.
+✅ **Email digest: DONE (Aug 3, 2026).** Secrets set, test email confirmed sent ("Email sent" in run 30847797342). Arrives weekdays 7am ET.
+
+⬜ **Instant lead alerts: one tiny step left.** A workflow checks the quote-request inbox every 15 minutes and emails Dom a 🔥 alert (plus an auto-acknowledgment to the consumer). It needs to know which inbox to watch — after Dom's sync code is set and the quote link shows in the app, copy the code from the end of the link (`quote.html?c=THIS-PART`) and run:
+
+```bash
+gh variable set INBOX_CODE -R kmcm1412/li-lead-engine --body "paste-the-code-here"
+```
+
+(Or on github.com: repo → Settings → Secrets and variables → Actions → **Variables** tab → New repository variable.) Until it's set, the alert runs skip harmlessly. Test with `gh workflow run lead-alerts.yml`.
 
 ## 1. Daily email digest (~3 minutes)
 

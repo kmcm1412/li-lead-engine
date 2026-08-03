@@ -139,6 +139,7 @@
   <button data-tab="leads" onclick="showTab('leads')">🔎 Find Leads</button>
   <button data-tab="qualify" onclick="showTab('qualify')">✅ Qualify</button>
   <button data-tab="pipeline" onclick="showTab('pipeline')">📋 My Pipeline <span class="badge" id="pipeCount">0</span></button>
+  <button data-tab="stats" onclick="showTab('stats')">📊 Stats</button>
   <button data-tab="scripts" onclick="showTab('scripts')">✉️ Scripts &amp; Letters</button>
   <button data-tab="help" onclick="showTab('help')">📖 How It Works</button>
 </nav>
@@ -156,13 +157,18 @@
   <div class="help" style="padding:16px 20px" id="inboxCard">
     <h2 style="margin-bottom:2px">📥 Quote requests <span class="note" style="display:inline">— people who filled out your quote form</span> <button class="btn small ghost" onclick="fetchInbox(true)" style="float:right">↻ Check now</button></h2>
     <div id="inboxList"><span class="note">Checking…</span></div>
-    <div class="note" style="margin-top:10px;border-top:1px solid var(--line2);padding-top:10px">🔗 <b>Your quote form</b> — text it to prospects, post it in local Facebook groups, add it to your email signature. Every submission lands here with full contact info, pre-qualified with your criteria:<br>
+    <div class="note" style="margin-top:10px;border-top:1px solid var(--line2);padding-top:10px">🔗 <b>Your quote form</b> — every submission lands here with full contact info, pre-qualified with your criteria. Each button tags the source so 📊 Stats shows which channel produces:<br>
       <span id="qlink" style="color:var(--blue);word-break:break-all;font-weight:600"></span>
-      <button class="btn small secondary" onclick="copyQuoteLink()" style="margin-left:6px">📋 Copy link</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn small secondary" onclick="copySrc('text')">💬 Copy for texting</button>
+        <button class="btn small secondary" onclick="copySrc('facebook')">📘 Copy for Facebook</button>
+        <button class="btn small secondary" onclick="copySrc('email')">✉️ Copy for email signature</button>
+        <button class="btn small secondary" onclick="openFlyer()">🖨️ Print QR flyer</button>
+      </div>
     </div>
   </div>
   <div class="help" style="padding:16px 20px">
-    <h2 style="margin-bottom:6px">⏰ Follow-ups due</h2>
+    <h2 style="margin-bottom:6px">⏰ Follow-ups due <button class="btn small" onclick="startCalls()" style="float:right">📞 Start call session</button></h2>
     <div id="dueList"></div>
   </div>
   <div class="help" style="padding:16px 20px">
@@ -326,6 +332,20 @@
   <div id="pipeList"></div>
 </div>
 
+<!-- ============ STATS ============ -->
+<div class="panel" id="panel-stats">
+  <div class="stats" id="statCards"></div>
+  <div class="help">
+    <h2>Where your business comes from</h2>
+    <p class="note" style="margin:0 0 10px">Every lead is tagged by source — quote form (with channel), homeowner feed, business feed, qualifier. This is how you learn which channel to double down on.</p>
+    <div id="srcTable" style="overflow-x:auto"></div>
+  </div>
+  <div class="help">
+    <h2>Activity</h2>
+    <div id="actStats"></div>
+  </div>
+</div>
+
 <!-- ============ SCRIPTS ============ -->
 <div class="panel" id="panel-scripts">
   <div class="help" style="margin-bottom:14px">
@@ -380,6 +400,9 @@
       <li><b>🖨️ Letters &amp; 🏷️ labels</b> — tick the ✉ box on the leads you want (or filter first and select none to use all shown), then print ready-to-sign letters and an Avery 5160 label sheet. Ten letters a day takes about 15 minutes including stuffing envelopes.</li>
       <li><b>🔍 Registry lookup</b> — someone calls in or gets referred? Search their business name to see their entity, filing date, and address before you pick up the quote.</li>
       <li><b>Cross-sell chips</b> — every commercial account owner also has a home, cars, and a family. Tick Home/Auto/Life/Umbrella as you place them; an account with 3+ lines almost never leaves.</li>
+      <li><b>📞 Call session</b> (Today tab) — works your due follow-ups like a dialer: one prospect at a time with the right script on screen, tap-to-call, and one-tap outcomes that reschedule automatically (no answer +2 days, voicemail +3, talked → quoting +1). The industry rule: leads called within 5 minutes close many times more often — when a 🔥 quote-request alert hits your email, call immediately.</li>
+      <li><b>📊 Stats</b> — win rate, premium, and leads by source. The quote-form share buttons tag each channel (texting / Facebook / email signature / flyer), so after a few weeks you'll know exactly which one fills the pipeline — double down there.</li>
+      <li><b>🖨️ QR flyer</b> — print it, tape it at the counter of businesses you insure, hand it out at Chamber events. Scans straight to your quote form.</li>
     </ul>
     <h3>Why these leads are better than purchased leads</h3>
     <ul>
@@ -474,6 +497,42 @@ function showTab(t){
   if(t==='pipeline') renderPipeline();
   if(t==='scripts') renderTemplates();
   if(t==='today') renderToday();
+  if(t==='stats') renderStats();
+}
+function renderStats(){
+  const act=activePipe();
+  const rate=(+settings.commRate||10)/100;
+  const month=new Date().toISOString().slice(0,7);
+  const won=act.filter(p=>p.status==='Won'), lost=act.filter(p=>p.status==='Lost');
+  const open=act.filter(p=>['New','Contacted','Quoting'].includes(p.status));
+  const premAll=won.reduce((s,p)=>s+(+p.premium||0),0);
+  const premMonth=won.filter(p=>(p.wonDate||'').startsWith(month)).reduce((s,p)=>s+(+p.premium||0),0);
+  const pipeVal=open.reduce((s,p)=>s+(+p.premium||0),0);
+  const winRate=(won.length+lost.length)?Math.round(won.length/(won.length+lost.length)*100):null;
+  const card=(n,l)=>'<div class="stat"><div class="num">'+n+'</div><div class="lbl">'+l+'</div></div>';
+  document.getElementById('statCards').innerHTML=
+    card(open.length,'Open leads')+card(act.filter(p=>p.status==='Quoting').length,'Quoting now')+
+    card(won.length,'Won (all time)')+card(winRate===null?'—':winRate+'%','Win rate')+
+    card('$'+fmtNum(premMonth),'Premium this month')+card('$'+fmtNum(premAll),'Premium all time')+
+    card('$'+fmtNum(Math.round(premAll*rate)),'Est. commission')+card('$'+fmtNum(pipeVal),'Pipeline value');
+  const srcs={};
+  for(const p of act){
+    const key=p.label==='Quote request'?('Quote form'+(p.src&&p.src!=='direct'?' — '+p.src:'')) : (p.label||'Other');
+    (srcs[key]=srcs[key]||{n:0,open:0,won:0,prem:0}); const s=srcs[key];
+    s.n++; if(['New','Contacted','Quoting'].includes(p.status))s.open++;
+    if(p.status==='Won'){s.won++;s.prem+=(+p.premium||0)}
+  }
+  const rows=Object.entries(srcs).sort((a,b)=>b[1].n-a[1].n);
+  document.getElementById('srcTable').innerHTML=rows.length
+    ? '<table style="width:100%;border-collapse:collapse;font-size:14px"><tr style="text-align:left;color:var(--muted);font-size:12px;text-transform:uppercase"><th style="padding:6px 8px">Source</th><th style="padding:6px 8px">Leads</th><th style="padding:6px 8px">Open</th><th style="padding:6px 8px">Won</th><th style="padding:6px 8px">Premium won</th></tr>'+
+      rows.map(([k,v])=>'<tr style="border-top:1px solid var(--line2)"><td style="padding:7px 8px;font-weight:600">'+esc(k)+'</td><td style="padding:7px 8px">'+v.n+'</td><td style="padding:7px 8px">'+v.open+'</td><td style="padding:7px 8px">'+v.won+'</td><td style="padding:7px 8px">$'+fmtNum(v.prem)+'</td></tr>').join('')+'</table>'
+    : '<span class="note">No leads in the pipeline yet — stats build themselves as you work.</span>';
+  const touches=act.reduce((s,p)=>s+(p.touches||0),0);
+  const overdue=open.filter(p=>p.followUp&&p.followUp<new Date().toISOString().slice(0,10)).length;
+  document.getElementById('actStats').innerHTML=
+    '<p>📞 <b>'+touches+'</b> total touches logged (call-session dispositions)</p>'+
+    '<p>⏰ <b>'+overdue+'</b> follow-ups overdue'+(overdue?' — hit <b>📞 Start call session</b> on the Today tab':' — you’re caught up 🎉')+'</p>'+
+    '<p>📅 <b>'+act.filter(p=>p.xdate).length+'</b> renewal x-dates on file (your future book)</p>';
 }
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200)}
 
@@ -707,6 +766,8 @@ function renderPipeline(){
             ['New','Contacted','Quoting','Won','Lost'].map(s=>'<option'+(p.status===s?' selected':'')+'>'+s+'</option>').join('')+
           '</select>'+
           '<label class="note">Follow-up:</label><input type="date" value="'+(p.followUp||'')+'" onchange="setFollow(\''+p.id+'\',this.value)">'+
+          (p.phone?'<a class="btn small secondary" href="tel:'+esc(p.phone)+'" title="Call '+esc(p.phone)+'">📞 Call</a>':'')+
+          (p.email?'<a class="btn small secondary" href="mailto:'+esc(p.email)+'?subject='+encodeURIComponent('Your insurance quote — Dom Orza, The Troiano Agency (Allstate)')+'" title="Email '+esc(p.email)+'">✉️</a>':'')+
           '<a class="btn small secondary" target="_blank" href="'+g+'">🔍</a>'+
           '<button class="btn small ghost" onclick="delPipe(\''+p.id+'\')">🗑</button>'+
         '</div>'+
@@ -1132,6 +1193,68 @@ function copyAddr(id){
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Address copied'),()=>toast('Copy blocked'));
 }
 
+/* ================= call session (power-dialer lite) ================= */
+let callQueue=[],callIdx=0,callStats={};
+function startCalls(){
+  const today=new Date().toISOString().slice(0,10);
+  callQueue=activePipe().filter(p=>['New','Contacted','Quoting'].includes(p.status)&&p.followUp&&p.followUp<=today)
+    .sort((a,b)=>(a.followUp||'9999').localeCompare(b.followUp||'9999'));
+  if(!callQueue.length){toast('No follow-ups due right now — nothing to call. 🎉');return}
+  callIdx=0;callStats={calls:0,talked:0,quoting:0,won:0};
+  renderCall();
+}
+function callScriptFor(p){
+  if(p.label==='Quote request')return '“Hi '+esc((p.name||'').split(' ')[0])+', it’s Dom Orza from Allstate here in Smithtown — you sent in a quote request and I’ve got your numbers ready to run. Got two minutes?” (They asked for this call — be direct, quote fast.)';
+  if(p.label==='New homeowner')return '“Hi, is this '+esc((personName(p.name)||'').split(' ')[0])+'? It’s Dom Orza from Allstate in Smithtown — congratulations on the new place! Quick reason for my call: most new homeowners never see the policy their lender picked at closing, and bundling your auto usually beats it. Want me to take a quick look before your first renewal?”';
+  if(p.label==='Personal')return 'Bundle review follow-up — confirm the qualifier answers in the notes, then: “Let me put the home + auto bundle together — worst case you learn you already have a great deal.”';
+  return '“Hi, this is Dom Orza from the Troiano Agency here in Smithtown — congratulations on the new business! Quick call: New York has a couple of insurance requirements that catch new owners off guard. What stage are you at?” (If they have coverage → get the x-date!)';
+}
+function renderCall(){
+  const back=document.getElementById('modalBack');
+  if(callIdx>=callQueue.length){
+    document.getElementById('mTitle').textContent='📞 Session complete';
+    document.getElementById('mBody').innerHTML='<div style="text-align:center;padding:10px 0 6px;font-size:15px">'+
+      '<div style="font-size:40px">🎉</div>'+
+      '<p style="margin:10px 0"><b>'+callStats.calls+'</b> calls worked · <b>'+callStats.talked+'</b> conversations · <b>'+callStats.quoting+'</b> moved to quoting · <b>'+callStats.won+'</b> won</p>'+
+      '<p class="note">Every no-answer was auto-rescheduled — they’ll resurface on the right day.</p>'+
+      '<button class="btn" onclick="closeDetail()">Done</button></div>';
+    back.classList.add('open');return;
+  }
+  const p=callQueue[callIdx];
+  const phone=p.phone||(String(p.notes||'').match(/\(?\d{3}\)?[ .\-]?\d{3}[ .\-]?\d{4}/)||[])[0]||'';
+  const g='https://www.google.com/search?q='+encodeURIComponent('"'+p.name+'" '+(p.city||'')+' NY');
+  document.getElementById('mTitle').textContent='📞 Call session — '+(callIdx+1)+' of '+callQueue.length;
+  document.getElementById('mBody').innerHTML=
+    '<div style="font-size:18px;font-weight:800">'+esc(p.label==='New homeowner'?titleCase(personName(p.name)):p.name)+'</div>'+
+    '<div class="note">'+esc(p.label||'')+(p.city?' · '+esc(p.city):'')+(p.carrier?' · with '+esc(p.carrier):'')+(p.xdate?' · renews '+p.xdate:'')+' · touch #'+((p.touches||0)+1)+'</div>'+
+    '<div style="font-size:22px;margin:10px 0">'+(phone?'<a href="tel:'+esc(phone)+'" style="color:var(--blue);font-weight:800;text-decoration:none">📞 '+esc(phone)+'</a>':'<a class="btn small secondary" target="_blank" href="'+g+'">🔍 No number on file — Google them</a>')+'</div>'+
+    (p.email?'<div style="margin-bottom:8px">✉️ <a href="mailto:'+esc(p.email)+'" style="color:var(--blue)">'+esc(p.email)+'</a></div>':'')+
+    '<div style="background:var(--blue-light);border-radius:8px;padding:10px 14px;font-size:13.5px;color:#27406e;margin-bottom:10px">'+callScriptFor(p)+'</div>'+
+    (p.notes?'<div class="note" style="max-height:70px;overflow:auto;margin-bottom:10px">'+esc(p.notes)+'</div>':'')+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button class="btn small ghost" onclick="callDispo(2,null)">📵 No answer (+2d)</button>'+
+      '<button class="btn small ghost" onclick="callDispo(3,null)">🗣 Left voicemail (+3d)</button>'+
+      '<button class="btn small secondary" onclick="callDispo(1,\'Quoting\')">✅ Talked — quoting (+1d)</button>'+
+      '<button class="btn small secondary" onclick="callDispo(0,\'Won\')">🏆 Won</button>'+
+      '<button class="btn small ghost" onclick="callDispo(0,\'Lost\')">❌ Not interested</button>'+
+      '<button class="btn small ghost" onclick="callIdx++;renderCall()">Skip →</button>'+
+    '</div>';
+  back.classList.add('open');
+}
+function callDispo(days,status){
+  const p=callQueue[callIdx];
+  p.touches=(p.touches||0)+1;p.ts=Date.now();
+  callStats.calls++;
+  if(status){p.status=status;
+    if(status==='Won'){p.wonDate=new Date().toISOString().slice(0,10);callStats.won++;callStats.talked++}
+    if(status==='Quoting'){callStats.quoting++;callStats.talked++}
+    if(status==='Lost')callStats.talked++;
+  }
+  if(days>0){const d=new Date();d.setDate(d.getDate()+days);p.followUp=d.toISOString().slice(0,10)}
+  savePipe();
+  callIdx++;renderCall();
+}
+
 /* ================= quote-form inbox ================= */
 let inboxItems=[],lastInboxFetch=0,firstPullDone=false;
 function ensureInbox(){
@@ -1146,6 +1269,11 @@ function ensureInbox(){
 function quoteLink(){return 'https://kmcm1412.github.io/li-lead-engine/quote.html?c='+settings.inboxCode}
 function inboxUrl(){return 'https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/pipelines/inbox-'+encodeURIComponent(settings.inboxCode)+'?key='+SYNC.apiKey}
 function copyQuoteLink(){(navigator.clipboard?navigator.clipboard.writeText(quoteLink()):Promise.reject()).then(()=>toast('Link copied — send it to anyone who wants a quote'),()=>toast('Copy blocked'))}
+function copySrc(src){
+  const l=quoteLink()+'&src='+src;
+  (navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Copied — submissions from this link will show "via '+src+'"'),()=>toast('Copy blocked'));
+}
+function openFlyer(){window.open('flyer.html?c='+encodeURIComponent(settings.inboxCode),'_blank')}
 async function fetchInbox(force){
   const card=document.getElementById('inboxCard'); if(!card)return;
   if(!SYNC){card.style.display='none';return}
@@ -1178,6 +1306,7 @@ function renderInbox(){
   el.innerHTML=items.map(s=>'<div class="inbox-item">'+
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
       '<b style="flex:1;min-width:140px">'+esc(s.name)+'</b>'+qVerdictMini(s)+
+      (s.src&&s.src!=='direct'?'<span class="chip flag">via '+esc(s.src)+'</span>':'')+
       (s.products?'<span class="chip">'+esc(s.products)+'</span>':'')+
       '<span class="note">'+new Date(s.ts||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>'+
     '</div>'+
@@ -1206,6 +1335,7 @@ function inboxAdd(ts){
   const notes='Quote request — 📞 '+s.phone+(s.email?' · ✉️ '+s.email:'')+' · at-fault acc(3yr): '+(s.acc||'?')+' · DWI(5yr): '+(s.dwi||'?')+' · 12mo coverage: '+(s.cov||'?')+(s.state&&s.state!=='NY'?' · ⚠️ NOT NY':'')+(s.renew?' · renews: '+s.renew:'')+(s.notes?' · notes: '+s.notes:'');
   pipeline.unshift({id:'in'+ts,name:s.name,addr:'',city:s.town||'',zip:'',county:'',filed:'',
     lines:s.products||'Auto quote',label:'Quote request',status:'New',notes,
+    phone:s.phone||'',email:s.email||'',src:s.src||'',
     carrier:s.carrier||'',xdate:'',followUp:new Date().toISOString().slice(0,10),added:new Date().toISOString().slice(0,10),ts:Date.now()});
   savePipe();
   inboxItems=inboxItems.filter(x=>x.ts!==ts);

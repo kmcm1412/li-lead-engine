@@ -83,7 +83,16 @@
   <div class="big">✅</div>
   <h2>Got it — you’re on Dom’s list!</h2>
   <p>Dom will reach out shortly with your numbers. Want them faster?<br>Call or text <b>(631) 724-2100</b> and mention you sent the form.</p>
+  <p style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">Know someone else overpaying for insurance?<br>
+  <button class="btn" style="width:auto;padding:10px 22px;margin-top:8px" onclick="shareRef()">📤 Share this with them</button></p>
 </div>
+<script>
+function shareRef(){
+  const link=location.origin+location.pathname+'?c='+encodeURIComponent(new URLSearchParams(location.search).get('c')||'')+'&src=referral';
+  if(navigator.share){navigator.share({title:'Free insurance quote — Dom Orza, Allstate',text:'Dom saved me money on insurance — takes 60 seconds:',url:link}).catch(()=>{})}
+  else{(navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>alert('Link copied — paste it in a text!'),()=>prompt('Copy this link:',link))}
+}
+</script>
 <script>
 "use strict";
 const CFG={apiKey:"AIzaSyBQpiWpPM-sim2Up5RG7NroKfrtePL43i0",projectId:"li-lead-engine"};
@@ -109,6 +118,7 @@ async function submitLead(){
     cov:document.getElementById('fCov').value,
     dwi:document.getElementById('fDwi').value,
     state:document.getElementById('fState').value,
+    src:new URLSearchParams(location.search).get('src')||'direct',
     notes:document.getElementById('fNotes').value.trim()};
   try{
     let arr=[];

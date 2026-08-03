@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Quote Flyer — print me</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#16203a;background:#e9edf5}
+  .bar{padding:14px;text-align:center;background:#fff;border-bottom:1px solid #dde3ec}
+  .bar button{background:#0033A0;color:#fff;border:none;border-radius:8px;padding:10px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+  .sheet{width:8.5in;min-height:11in;margin:20px auto;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.15);padding:.9in .8in;display:flex;flex-direction:column;align-items:center;text-align:center}
+  h1{font-size:34px;font-weight:800;letter-spacing:-.02em;color:#00256e;line-height:1.15}
+  .sub{font-size:19px;color:#38415a;margin-top:10px}
+  .qr{margin:34px 0 10px;border:10px solid #0033A0;border-radius:18px;padding:14px;background:#fff}
+  .qr img{display:block;width:3in;height:3in}
+  .scan{font-size:17px;font-weight:700;color:#0033A0}
+  ul{list-style:none;margin:26px 0 0;font-size:16.5px;line-height:2}
+  .who{margin-top:auto;padding-top:26px;border-top:2px solid #dde3ec;width:100%}
+  .who b{font-size:19px}
+  .who div{font-size:15px;color:#38415a}
+  .phone{font-size:26px;font-weight:800;color:#0033A0;margin-top:6px}
+  @media print{.bar{display:none}body{background:#fff}.sheet{margin:0;box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="bar"><button onclick="window.print()">🖨️ Print flyer</button></div>
+<div class="sheet">
+  <h1>Overpaying for<br>car &amp; home insurance?</h1>
+  <div class="sub">Long Island rates jumped again. Most drivers who bundle save real money.<br><b>Find out in 60 seconds — free, no obligation.</b></div>
+  <div class="qr"><img id="qrImg" alt="Scan for a free quote"></div>
+  <div class="scan">📱 Scan with your phone camera for a free quote</div>
+  <ul>
+    <li>🚗 Auto &nbsp;·&nbsp; 🏠 Home &nbsp;·&nbsp; 🔑 Renters &nbsp;·&nbsp; ⛵ Boat &nbsp;·&nbsp; 🏍️ Motorcycle</li>
+    <li>💰 Bundle auto + home for the biggest savings</li>
+  </ul>
+  <div class="who">
+    <b>Dom Orza</b> · The Troiano Agency — Allstate®
+    <div>25 Manor Rd, Smithtown, NY 11787</div>
+    <div class="phone">📞 (631) 724-2100</div>
+  </div>
+</div>
+<script>
+const c=new URLSearchParams(location.search).get('c')||'';
+const link='https://kmcm1412.github.io/li-lead-engine/quote.html?c='+encodeURIComponent(c)+'&src=flyer';
+document.getElementById('qrImg').src='https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=1&data='+encodeURIComponent(link);
+</script>
+</body>
+</html>

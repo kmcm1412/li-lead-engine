@@ -1133,7 +1133,7 @@ function copyAddr(id){
 }
 
 /* ================= quote-form inbox ================= */
-let inboxItems=[],lastInboxFetch=0;
+let inboxItems=[],lastInboxFetch=0,firstPullDone=false;
 function ensureInbox(){
   if(!SYNC)return null;
   if(!settings.inboxCode){
@@ -1149,6 +1149,12 @@ function copyQuoteLink(){(navigator.clipboard?navigator.clipboard.writeText(quot
 async function fetchInbox(force){
   const card=document.getElementById('inboxCard'); if(!card)return;
   if(!SYNC){card.style.display='none';return}
+  if(!settings.syncCode){
+    document.getElementById('inboxList').innerHTML='<span class="note">⚠️ <b>One-time step:</b> set your <b>sync code</b> in ✉️ Scripts &amp; Letters first (enter the <b>same code</b> on your phone and computer). That links your devices so quote requests show up everywhere — your shareable form link will appear right here once it’s set.</span>';
+    document.getElementById('qlink').textContent='(appears after you set your sync code)';
+    return;
+  }
+  if(!firstPullDone){document.getElementById('inboxList').innerHTML='<span class="note">Connecting to your synced inbox…</span>';return}
   ensureInbox();
   document.getElementById('qlink').textContent=quoteLink();
   if(!force&&Date.now()-lastInboxFetch<60e3){renderInbox();return}
@@ -1229,8 +1235,10 @@ async function pullCloud(push){
     let remote=[];
     if(r.status===404){remote=[]}
     else if(r.ok){const d=await r.json();try{remote=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}catch(e){remote=[]}
-      if(d.fields&&d.fields.inbox&&d.fields.inbox.stringValue&&!settings.inboxCode){settings.inboxCode=d.fields.inbox.stringValue;localStorage.setItem(LS_SET,JSON.stringify(settings))}}
+      const ri=d.fields&&d.fields.inbox&&d.fields.inbox.stringValue;
+      if(ri&&ri!==settings.inboxCode){settings.inboxCode=ri;localStorage.setItem(LS_SET,JSON.stringify(settings));lastInboxFetch=0;firstPullDone=true;fetchInbox(true)}}
     else throw new Error('HTTP '+r.status);
+    firstPullDone=true;
     mergeRemote(remote);
     localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));
     document.getElementById('pipeCount').textContent=activePipe().filter(p=>['New','Contacted','Quoting'].includes(p.status)).length;
@@ -1243,6 +1251,7 @@ async function pullCloud(push){
       if(!w.ok)throw new Error('HTTP '+w.status);
     }
     setSyncStatus('✓ Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
+    fetchInbox();
   }catch(e){setSyncStatus('⚠ Sync unavailable — working from this device’s copy',true)}
   finally{syncBusy=false}
 }

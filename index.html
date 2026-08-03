@@ -108,6 +108,21 @@
   .verdict.warn{background:var(--amber-light);border:1px solid #f0d9b0;color:#7c4a03}
   .verdict.bad{background:var(--red-light);border:1px solid #f3c6c6;color:#7f1d1d}
   .verdict b{display:block;font-size:15.5px;margin-bottom:4px}
+  .lead-name{cursor:pointer}
+  .lead-name:hover{color:var(--blue);text-decoration:underline;text-underline-offset:3px}
+  .modal-back{position:fixed;inset:0;background:rgba(10,18,40,.45);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:5vh 14px;overflow-y:auto;backdrop-filter:blur(2px)}
+  .modal-back.open{display:flex}
+  .modal{background:#fff;border-radius:14px;max-width:640px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:fadein .15s ease}
+  .modal-hd{background:linear-gradient(135deg,var(--blue-deep),var(--blue));color:#fff;border-radius:14px 14px 0 0;padding:18px 22px;display:flex;gap:10px;align-items:flex-start}
+  .modal-hd h2{font-size:17px;letter-spacing:-.01em;flex:1}
+  .modal-hd .x{background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;width:30px;height:30px;font-size:15px;cursor:pointer;flex:none}
+  .modal-bd{padding:18px 22px}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px;font-size:14px;margin-bottom:14px}
+  .kv dt{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;padding-top:1px}
+  .kv dd{margin:0;word-break:break-word}
+  .modal-links{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+  .modal-note{background:var(--blue-light);border-radius:8px;padding:10px 14px;font-size:13px;color:#27406e;margin-top:12px}
+  .inbox-item{border:1px solid var(--line);border-left:4px solid var(--green);border-radius:10px;padding:11px 14px;margin-bottom:8px;background:#fbfffc}
   @media print{header,nav,.toolbar,.lead-actions,.btn{display:none!important}}
 </style>
 </head>
@@ -138,12 +153,20 @@
     <div class="stat"><div class="num" id="gPipe">$0</div><div class="lbl">Pipeline value</div></div>
   </div>
   <div class="help" style="padding:14px 18px" id="goalBar"></div>
+  <div class="help" style="padding:16px 20px" id="inboxCard">
+    <h2 style="margin-bottom:2px">📥 Quote requests <span class="note" style="display:inline">— people who filled out your quote form</span> <button class="btn small ghost" onclick="fetchInbox(true)" style="float:right">↻ Check now</button></h2>
+    <div id="inboxList"><span class="note">Checking…</span></div>
+    <div class="note" style="margin-top:10px;border-top:1px solid var(--line2);padding-top:10px">🔗 <b>Your quote form</b> — text it to prospects, post it in local Facebook groups, add it to your email signature. Every submission lands here with full contact info, pre-qualified with your criteria:<br>
+      <span id="qlink" style="color:var(--blue);word-break:break-all;font-weight:600"></span>
+      <button class="btn small secondary" onclick="copyQuoteLink()" style="margin-left:6px">📋 Copy link</button>
+    </div>
+  </div>
   <div class="help" style="padding:16px 20px">
     <h2 style="margin-bottom:6px">⏰ Follow-ups due</h2>
     <div id="dueList"></div>
   </div>
   <div class="help" style="padding:16px 20px">
-    <h2 style="margin-bottom:2px">🏠 Newest homeowner leads <span class="note" style="display:inline">— just-recorded Queens home purchases, individual buyers</span></h2>
+    <h2 style="margin-bottom:2px">🏠 Newest homeowner leads <span class="note" style="display:inline">— auto + home bundle prospects (Queens deed filings, individual buyers)</span></h2>
     <div id="homeList"><div class="note">Loading deed filings…</div></div>
   </div>
   <div class="help" style="padding:16px 20px">
@@ -177,6 +200,9 @@
         <option value="easy">✅ Easier to write (BOP box)</option>
         <option value="hard">⚠️ Specialty / hard to place</option>
       </select>
+    </div>
+    <div class="bizonly"><label>Business category</label>
+      <select id="fCat"><option value="">All categories</option></select>
     </div>
     <div class="bizonly2"><label>Filed within</label>
       <select id="fDays">
@@ -244,9 +270,14 @@
       <span class="pill" data-q="Motorcycle" onclick="qPill(this)">🏍️ Motorcycle</span>
     </div>
     <div class="qgrid" style="margin-top:14px">
-      <div><label class="fld">Accidents in the last 3 years</label>
+      <div><label class="fld">At-fault accidents (last 3 years)</label>
         <div class="seg" id="qAcc">
           <button class="on" onclick="qSeg(this,'qAcc')" data-v="0">0</button><button onclick="qSeg(this,'qAcc')" data-v="1">1</button><button onclick="qSeg(this,'qAcc')" data-v="2">2+</button>
+        </div>
+      </div>
+      <div><label class="fld">Any DWI in the last 5 years?</label>
+        <div class="seg" id="qDwi">
+          <button class="on" onclick="qSeg(this,'qDwi')" data-v="no">No</button><button onclick="qSeg(this,'qDwi')" data-v="yes">Yes</button>
         </div>
       </div>
       <div><label class="fld">Insured 12+ months, no lapse?</label>
@@ -333,7 +364,7 @@
     </ul>
     <h3>"Commercial is too hard to write" — work the appetite, not the class</h3>
     <p>Commercial feels hard because the classes that <i>need</i> insurance most — contractors, trucking, day cares — are exactly what standard carriers decline. The tool now tags every business lead: <b>✅ BOP-friendly</b> (offices, retail, salons, restaurants, landlords, fitness — standard-market writable) vs <b>⚠️ Specialty market</b> (hard to place). Use the <b>Carrier appetite</b> filter to work only the writable ones. And a ⚠️ lead isn't wasted: "I may not be able to beat your GL, but let me look at your home and auto" — the owner is still a personal-lines household. Landlord/realty LLCs are especially good: that's commercial <i>property</i>, the lines you already specialize in.</p>
-    <p><b>The personal-lines writing box</b> (built into the ✅ Qualify tab): auto needs ≤1 accident in 3 years and 12+ months continuous prior coverage with no lapse; homeowners must not be on or near the water; renters, boat, and motorcycle are easy adds. Run every prospect through Qualify before quoting — it applies the rules for you.</p>
+    <p><b>The auto writing box</b> (built into ✅ Qualify and the quote form): NY state only · max 1 <b>at-fault</b> accident in the last 3 years · <b>no DWI</b> in the last 5 years · 12+ months continuous prior coverage, no lapse. Homeowners must not be on or near the water. Renters, boat, and motorcycle are easy adds. Run every prospect through Qualify before quoting — it applies the rules for you.</p>
     <h3>The 20-minute daily routine</h3>
     <ol>
       <li><b>Refresh Leads</b> each morning (Suffolk, last 7–14 days).</li>
@@ -376,6 +407,12 @@
 
 </main>
 <div class="toast" id="toast"></div>
+<div class="modal-back" id="modalBack" onclick="if(event.target===this)closeDetail()">
+  <div class="modal">
+    <div class="modal-hd"><h2 id="mTitle"></h2><button class="x" onclick="closeDetail()">✕</button></div>
+    <div class="modal-bd" id="mBody"></div>
+  </div>
+</div>
 
 <script src="sync-config.js"></script>
 <script>
@@ -467,6 +504,10 @@ async function fetchBiz(){
     const res=await fetch(url);
     if(!res.ok) throw new Error('HTTP '+res.status);
     leadsBiz=mapRows(await res.json());
+    const counts={};leadsBiz.forEach(l=>{if(l.cls.label)counts[l.cls.label]=(counts[l.cls.label]||0)+1});
+    const sel=document.getElementById('fCat'),cur=sel.value;
+    sel.innerHTML='<option value="">All categories</option>'+Object.keys(counts).sort()
+      .map(c=>'<option value="'+esc(c)+'"'+(c===cur?' selected':'')+'>'+esc(c)+' ('+counts[c]+')'+(HARD_LABELS.has(c)?' ⚠️':' ✅')+'</option>').join('');
     if(curSource()==='biz'){leads=leadsBiz;renderLeads()}
     renderToday();
   }catch(err){
@@ -511,7 +552,7 @@ async function fetchHomes(){
         ageDays:Math.round((Date.now()-new Date(recorded))/864e5),
         type:PTYPE[lg.property_type], county:'Queens',
         addr:mailAddr, city, state:st, zip, prop, price, indiv, water,
-        cls:{label:'New homeowner',lines:(condo?'HO-6 Condo':'Homeowners')+' + Auto bundle'+(water?' · verify water distance':''),weight:indiv?3:1},
+        cls:{label:'New homeowner',lines:'Auto + '+(condo?'HO-6 condo':'homeowners')+' bundle'+(water?' · verify water distance':''),weight:indiv?3:1},
         score:(indiv?30:0)+(water?-5:0)+Math.max(0,20-Math.floor((Date.now()-new Date(recorded))/864e5/7))
       };
     }).filter(Boolean);
@@ -535,10 +576,12 @@ function mapRows(rows){
       addr:[r.dos_process_address_1,r.dos_process_address_2].filter(Boolean).join(', '),
       city:r.dos_process_city||'', state:r.dos_process_state||'NY', zip:(r.dos_process_zip||'').slice(0,5),
       cls, viaAgent,
+      agentName:r.registered_agent_name||'', agentAddr:[r.registered_agent_address_1,r.registered_agent_city,r.registered_agent_zip].filter(Boolean).join(', '),
       score: cls.weight*10 + Math.max(0,14-ageDays) + (cls.weight>=2&&!isHard(cls)?6:0)
     };
   });
 }
+function findLead(id){return leads.find(x=>x.id===id)||leadsHome.find(x=>x.id===id)||leadsBiz.find(x=>x.id===id)}
 async function lookupBiz(){
   const q=document.getElementById('lkName').value.trim();
   if(!q){toast('Type a business name first');return}
@@ -565,6 +608,8 @@ function filteredLeads(){
   if(town) out=out.filter(l=>l.city.toLowerCase().includes(town)||l.zip.startsWith(town)||(l.prop&&l.prop.toLowerCase().includes(town)));
   const app=document.getElementById('fAppetite').value;
   if(curSource()==='biz'&&app)out=out.filter(l=>app==='hard'?isHard(l.cls):(l.cls.weight>=1&&!isHard(l.cls)));
+  const cat=document.getElementById('fCat').value;
+  if(curSource()==='biz'&&cat)out=out.filter(l=>l.cls.label===cat);
   const sort=document.getElementById('fSort').value;
   out.sort(sort==='date' ? (a,b)=>b.filed.localeCompare(a.filed) : (a,b)=>b.score-a.score||b.filed.localeCompare(a.filed));
   return out;
@@ -597,7 +642,7 @@ function renderLeads(){
       : esc(l.addr? l.addr+', ':'')+esc(l.city)+', NY '+esc(l.zip)+' · '+esc(l.county)+' County'+(l.viaAgent?' · <i>via registered agent</i>':'');
     return '<div class="lead-card">'+
       '<div class="lead-main">'+
-        '<div class="lead-name">'+esc(l.kind==='home'?titleCase(l.name):l.name)+'</div>'+
+        '<div class="lead-name" onclick="showDetail(\''+l.id+'\')" title="Click for full details">'+esc(l.kind==='home'?titleCase(l.name):l.name)+' <span style="color:var(--muted);font-size:12px;font-weight:500">ⓘ</span></div>'+
         '<div class="lead-addr">'+addrLine+'</div>'+
         (l.cls.lines?'<div class="lines-hint">→ '+(l.kind==='home'?'Quote: ':'Likely needs: ')+l.cls.lines+(l.kind!=='home'&&isHard(l.cls)?' <span style="color:var(--amber)">· hard to place — pivot to the owner’s home + auto bundle</span>':'')+'</div>':'')+
         '<div class="lead-meta">'+prio+appetite+fresh+
@@ -618,7 +663,7 @@ function renderLeads(){
     '</div>';
   }).join('') + (out.length>400?'<div class="note">Showing first 400 of '+out.length+'.</div>':'');
 }
-['fTown','fArea','fSort','fAppetite'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(leads.length)renderLeads()}));
+['fTown','fArea','fSort','fAppetite','fCat'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(leads.length)renderLeads()}));
 function hideLead(id){hidden[id]=1;localStorage.setItem(LS_HIDE,JSON.stringify(hidden));renderLeads()}
 
 /* ================= pipeline ================= */
@@ -873,8 +918,11 @@ function openPrintWin(html){
   w.document.write(html);w.document.close();
 }
 function printLetters(){
-  let t=mailTargets();
+  const t=mailTargets();
   if(!t.length){toast('Refresh leads first (or tick some ✉ boxes)');return}
+  printLetterPages(t);
+}
+function printLetterPages(t){
   if(t.length>100){t=t.slice(0,100);toast('Capped at the first 100 letters')}
   const dateStr=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   const bizBody=(TEMPLATES.find(x=>x.t.indexOf('New-business congratulations')===0)||TEMPLATES[0]).b;
@@ -909,6 +957,7 @@ function printLabels(){
 function renderToday(){
   const el=document.getElementById('dueList');
   if(!el)return;
+  fetchInbox();
   const todayStr=new Date().toISOString().slice(0,10);
   const month=todayStr.slice(0,7);
   const act=activePipe();
@@ -943,7 +992,7 @@ function renderToday(){
     else{
       const homes=leadsHome.filter(l=>!hidden[l.id]&&l.indiv&&!activeIds.has(l.id)).slice(0,8);
       hm.innerHTML=homes.length?homes.map(l=>'<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line2);flex-wrap:wrap">'+
-          '<b style="flex:1;min-width:150px">'+esc(titleCase(l.name))+'</b><span class="note">'+esc(l.prop)+', Queens</span>'+
+          '<b style="flex:1;min-width:150px;cursor:pointer" onclick="showDetail(\''+l.id+'\')" title="Full details">'+esc(titleCase(l.name))+'</b><span class="note">'+esc(l.prop)+', Queens</span>'+
           (l.price?'<span class="chip new">$'+fmtNum(l.price)+'</span>':'')+
           (l.water?'<span class="chip flag">🌊</span>':'')+
           '<button class="btn small" onclick="addToPipe(\''+l.id+'\')">+ Pipeline</button>'+
@@ -956,7 +1005,7 @@ function renderToday(){
   const hot=leadsBiz.filter(l=>!hidden[l.id]&&l.cls.weight>=2&&l.ageDays<=3&&!activeIds.has(l.id))
     .sort((a,b)=>(isHard(a.cls)?1:0)-(isHard(b.cls)?1:0)||b.score-a.score).slice(0,10);
   hl.innerHTML=hot.length?hot.map(l=>'<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line2);flex-wrap:wrap">'+
-      '<b style="flex:1;min-width:150px">'+esc(l.name)+'</b><span class="note">'+esc(l.city)+', '+esc(l.county)+'</span>'+
+      '<b style="flex:1;min-width:150px;cursor:pointer" onclick="showDetail(\''+l.id+'\')" title="Full details">'+esc(l.name)+'</b><span class="note">'+esc(l.city)+', '+esc(l.county)+'</span>'+
       (isHard(l.cls)?'<span class="chip warm">⚠️ specialty</span>':(l.cls.weight>=2?'<span class="chip new">✅ BOP</span>':''))+
       (l.cls.lines?'<span class="lines-hint" style="margin:0">'+l.cls.lines+'</span>':'')+
       '<a class="btn small secondary" target="_blank" href="https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+l.city+' NY')+'">🔍</a>'+
@@ -973,15 +1022,16 @@ function qVal(id){const b=document.querySelector('#'+id+' button.on');return b?b
 function qCheck(){
   const v=document.getElementById('qVerdict'); if(!v)return;
   const town=document.getElementById('qTown').value.trim();
-  const acc=qVal('qAcc'),cov=qVal('qCov'),own=qVal('qOwn'),water=qVal('qWater');
+  const acc=qVal('qAcc'),cov=qVal('qCov'),own=qVal('qOwn'),water=qVal('qWater'),dwi=qVal('qDwi');
   const coastal=town&&nearWater(town,town);
   const msgs=[]; let cls='ok', head='✅ Good to quote';
-  if(acc==='2'){cls='bad';head='❌ Outside the auto box';msgs.push('2+ accidents in the last 3 years — can’t write the auto.')}
-  else if(cov==='no'){cls='bad';head='❌ Outside the auto box';msgs.push('No 12 months continuous prior coverage (or a lapse) — can’t write the auto.')}
-  else{
-    if(acc==='1')msgs.push('1 accident in 3 years — acceptable (that’s the limit).');
+  if(dwi==='yes'){cls='bad';head='❌ Outside the auto box';msgs.push('DWI within the last 5 years — can’t write the auto.')}
+  if(acc==='2'){cls='bad';head='❌ Outside the auto box';msgs.push('2+ at-fault accidents in the last 3 years — can’t write the auto.')}
+  if(cov==='no'){cls='bad';head='❌ Outside the auto box';msgs.push('No 12 months continuous prior coverage (or a lapse) — can’t write the auto.')}
+  if(cls!=='bad'){
+    if(acc==='1')msgs.push('1 at-fault accident in 3 years — acceptable (that’s the limit).');
     if(cov==='unk')msgs.push('Confirm 12+ months continuous coverage with no lapse before quoting the auto.');
-    if(acc!=='2'&&cov==='yes')msgs.push('Auto ✓ — meets the accident and prior-coverage criteria.');
+    if(acc!=='2'&&cov==='yes'&&dwi==='no')msgs.push('Auto ✓ — clean on accidents, DWI, and prior coverage. NY risks only.');
   }
   if(own==='own'){
     if(water==='yes'){if(cls==='ok'){cls='warn';head='⚠️ Quote with checks'}msgs.push('Home on/near the water — the agency can’t write waterfront. Verify the distance before promising anything.')}
@@ -996,7 +1046,7 @@ function qCheck(){
 function qSave(){
   const name=document.getElementById('qName').value.trim();
   if(!name){toast('Enter the prospect’s name first');return}
-  const notes='Qualifier — accidents(3yr): '+(qVal('qAcc')||'?')+' · 12mo continuous coverage: '+(qVal('qCov')||'?')+' · '+(qVal('qOwn')==='own'?'homeowner':'renter')+' · near water: '+(qVal('qWater')||'?')
+  const notes='Qualifier — at-fault acc(3yr): '+(qVal('qAcc')||'?')+' · DWI(5yr): '+(qVal('qDwi')||'?')+' · 12mo continuous coverage: '+(qVal('qCov')||'?')+' · '+(qVal('qOwn')==='own'?'homeowner':'renter')+' · near water: '+(qVal('qWater')||'?')
     +(document.getElementById('qContact').value?' · contact: '+document.getElementById('qContact').value:'');
   pipeline.unshift({id:'q'+Date.now(),name,addr:'',city:document.getElementById('qTown').value.trim(),zip:'',county:'',filed:'',
     lines:[...qProducts].join(' + ')||'Personal lines',label:'Personal',status:'New',notes,
@@ -1011,7 +1061,8 @@ function qCopy(){
     +'Products: '+([...qProducts].join(', ')||'—')+'\n'
     +'Current carrier: '+(document.getElementById('qCarrier').value||'—')+'\n'
     +'Renewal / x-date: '+(document.getElementById('qXdate').value||'—')+'\n'
-    +'Accidents (3yr): '+(qVal('qAcc')||'?')+'\n'
+    +'At-fault accidents (3yr): '+(qVal('qAcc')||'?')+'\n'
+    +'DWI (5yr): '+(qVal('qDwi')||'?')+'\n'
     +'12mo continuous coverage: '+(qVal('qCov')||'?')+'\n'
     +'Owns home: '+(qVal('qOwn')||'?')+'\n'
     +'Near water: '+(qVal('qWater')||'?');
@@ -1020,9 +1071,142 @@ function qCopy(){
 function qReset(){
   ['qName','qContact','qTown','qCarrier','qXdate'].forEach(id=>document.getElementById(id).value='');
   qProducts.clear();document.querySelectorAll('#panel-qualify .pill').forEach(p=>p.classList.remove('on'));
-  ['qAcc','qCov','qOwn','qWater'].forEach(id=>document.querySelectorAll('#'+id+' button').forEach((b,i)=>b.classList.toggle('on',i===0)));
+  ['qAcc','qDwi','qCov','qOwn','qWater'].forEach(id=>document.querySelectorAll('#'+id+' button').forEach((b,i)=>b.classList.toggle('on',i===0)));
   qCheck();
 }
+
+/* ================= lead detail ================= */
+function kvRow(k,v){return '<dt>'+esc(k)+'</dt><dd>'+v+'</dd>'}
+function showDetail(id){
+  const l=findLead(id); if(!l)return;
+  const enc=encodeURIComponent;
+  document.getElementById('mTitle').textContent=l.kind==='home'?titleCase(personName(l.name)):l.name;
+  let kv='',links=[],note='';
+  const inPipe=activePipe().some(p=>p.id===l.id);
+  if(l.kind==='home'){
+    kv=kvRow('Property',esc(l.prop)+', Queens, NY')
+      +kvRow('Sale price',l.price?'$'+fmtNum(l.price):'—')
+      +kvRow('Property type',esc(l.type))
+      +kvRow('Deed recorded',esc(l.filed))
+      +kvRow('Buyer(s)',esc(titleCase(l.name)))
+      +kvRow('Mailing address',esc((l.addr?l.addr+', ':'')+l.city+', '+(l.state||'NY')+' '+l.zip))
+      +(l.water?kvRow('🌊 Water check','<span style="color:var(--amber);font-weight:600">Known coastal area — verify distance before quoting the home</span>'):'')
+      +kvRow('Buyer type',l.indiv?'Individual — personal lines ✓':'Entity / investor — landlord-policy angle')
+      +kvRow('The pitch','<b style="color:var(--green)">Auto + '+(String(l.type).includes('Co')?'HO-6 condo':'homeowners')+' bundle</b> before their first renewal');
+    links=[['🗺️ Map','https://www.google.com/maps/search/'+enc(l.prop+', Queens, NY')],
+           ['🏘️ Zillow','https://www.zillow.com/homes/'+enc(l.prop+' Queens NY')+'_rb/'],
+           ['🔍 Google','https://www.google.com/search?q='+enc('"'+personName(l.name)+'" Queens NY')]];
+    note='Phone numbers and emails aren’t part of public deed records — the reliable first touch is the <b>welcome letter</b> (their mailing address is above, one click to print). Anyone who responds to your letter or quote-form link arrives with full contact info attached.';
+  }else{
+    kv=kvRow('Filing address',esc((l.addr?l.addr+', ':'')+l.city+', NY '+l.zip))
+      +kvRow('County',esc(l.county))
+      +kvRow('Entity type',esc(l.type))
+      +kvRow('Filed',esc(l.filed)+' · '+l.ageDays+' days ago')
+      +(l.cls.label?kvRow('Category',esc(l.cls.label)+(isHard(l.cls)?' · <span style="color:var(--amber);font-weight:600">⚠️ specialty market</span>':' · <span style="color:var(--green);font-weight:600">✅ BOP-friendly</span>')):'')
+      +(l.cls.lines?kvRow('Likely needs',esc(l.cls.lines)):'')
+      +(l.agentName?kvRow('Registered agent',esc(l.agentName)+(l.agentAddr?' — '+esc(l.agentAddr):'')):'')
+      +kvRow('NY DOS ID',esc(l.id));
+    links=[['🔍 Google','https://www.google.com/search?q='+enc('"'+l.name+'" '+l.city+' NY')],
+           ['🗺️ Map','https://www.google.com/maps/search/'+enc(l.addr+', '+l.city+' NY '+l.zip)],
+           ['📘 Facebook','https://www.facebook.com/search/top?q='+enc(l.name.replace(/,? (LLC|INC\.?|CORP\.?|LTD\.?)$/i,''))],
+           ['🏛️ NY DOS lookup','https://apps.dos.ny.gov/publicInquiry/']];
+    note='Brand-new filings don’t list a phone yet — the Google and Facebook links usually surface one within days of the business opening (check for a website or page). The filing address above is valid for mail <b>immediately</b>.'+(isHard(l.cls)?' <b>This class is hard to place</b> — lead with the owner’s personal home + auto bundle instead.':'');
+  }
+  document.getElementById('mBody').innerHTML=
+    '<dl class="kv">'+kv+'</dl>'+
+    '<div class="modal-links">'+links.map(x=>'<a class="btn small secondary" target="_blank" href="'+x[1]+'">'+x[0]+'</a>').join('')+'</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
+      '<button class="btn small" onclick="printOne(\''+l.id+'\')">🖨️ Print '+(l.kind==='home'?'welcome':'intro')+' letter</button>'+
+      '<button class="btn small secondary" onclick="copyAddr(\''+l.id+'\')">📋 Copy mailing address</button>'+
+      (inPipe?'<span class="chip new" style="align-self:center">✓ In pipeline</span>':'<button class="btn small secondary" onclick="addToPipe(\''+l.id+'\');showDetail(\''+l.id+'\')">+ Pipeline</button>')+
+    '</div>'+
+    '<div class="modal-note">'+note+'</div>';
+  document.getElementById('modalBack').classList.add('open');
+}
+function closeDetail(){document.getElementById('modalBack').classList.remove('open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail()});
+function printOne(id){const l=findLead(id);if(l)printLetterPages([l])}
+function copyAddr(id){
+  const l=findLead(id);if(!l)return;
+  const t=(l.kind==='home'?titleCase(personName(l.name)):l.name)+'\n'+l.addr+'\n'+l.city+', '+(l.state||'NY')+' '+l.zip;
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Address copied'),()=>toast('Copy blocked'));
+}
+
+/* ================= quote-form inbox ================= */
+let inboxItems=[],lastInboxFetch=0;
+function ensureInbox(){
+  if(!SYNC)return null;
+  if(!settings.inboxCode){
+    settings.inboxCode='q'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,8);
+    localStorage.setItem(LS_SET,JSON.stringify(settings));
+    schedulePush();
+  }
+  return settings.inboxCode;
+}
+function quoteLink(){return 'https://kmcm1412.github.io/li-lead-engine/quote.html?c='+settings.inboxCode}
+function inboxUrl(){return 'https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/pipelines/inbox-'+encodeURIComponent(settings.inboxCode)+'?key='+SYNC.apiKey}
+function copyQuoteLink(){(navigator.clipboard?navigator.clipboard.writeText(quoteLink()):Promise.reject()).then(()=>toast('Link copied — send it to anyone who wants a quote'),()=>toast('Copy blocked'))}
+async function fetchInbox(force){
+  const card=document.getElementById('inboxCard'); if(!card)return;
+  if(!SYNC){card.style.display='none';return}
+  ensureInbox();
+  document.getElementById('qlink').textContent=quoteLink();
+  if(!force&&Date.now()-lastInboxFetch<60e3){renderInbox();return}
+  lastInboxFetch=Date.now();
+  try{
+    const r=await fetch(inboxUrl());
+    if(r.ok){const d=await r.json();inboxItems=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}
+    else if(r.status===404)inboxItems=[];
+  }catch(e){}
+  renderInbox();
+}
+function qVerdictMini(s){
+  if(s.acc==='2+'||s.cov==='no'||s.dwi==='yes'||s.state==='other')return '<span class="chip hot">❌ outside the box</span>';
+  if(s.cov==='unsure')return '<span class="chip warm">⚠️ verify coverage history</span>';
+  return '<span class="chip new">✅ qualifies'+(s.acc==='1'?' (1 acc.)':'')+'</span>';
+}
+function renderInbox(){
+  const el=document.getElementById('inboxList'); if(!el)return;
+  const items=[...inboxItems].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(!items.length){el.innerHTML='<span class="note">No submissions yet — share the link below and they’ll appear here automatically.</span>';return}
+  el.innerHTML=items.map(s=>'<div class="inbox-item">'+
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<b style="flex:1;min-width:140px">'+esc(s.name)+'</b>'+qVerdictMini(s)+
+      (s.products?'<span class="chip">'+esc(s.products)+'</span>':'')+
+      '<span class="note">'+new Date(s.ts||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>'+
+    '</div>'+
+    '<div style="font-size:13.5px;margin-top:4px">📞 <a href="tel:'+esc(s.phone)+'" style="font-weight:700;color:var(--blue)">'+esc(s.phone)+'</a>'+
+      (s.email?' · ✉️ <a href="mailto:'+esc(s.email)+'" style="color:var(--blue)">'+esc(s.email)+'</a>':'')+
+      (s.town?' · '+esc(s.town):'')+'</div>'+
+    '<div class="note" style="margin-top:2px">'+
+      (s.carrier?'Carrier: '+esc(s.carrier)+' · ':'')+(s.renew?'Renews: '+esc(s.renew)+' · ':'')+
+      'At-fault acc: '+esc(s.acc||'?')+' · DWI: '+esc(s.dwi||'?')+' · 12mo coverage: '+esc(s.cov||'?')+(s.state&&s.state!=='NY'?' · <b style="color:var(--red)">NOT NY</b>':'')+
+      (s.notes?' · “'+esc(s.notes)+'”':'')+'</div>'+
+    '<div style="margin-top:7px;display:flex;gap:6px">'+
+      '<button class="btn small" onclick="inboxAdd('+s.ts+')">➕ Add to pipeline</button>'+
+      '<button class="btn small ghost" onclick="inboxRemove('+s.ts+')">🗑 Dismiss</button>'+
+    '</div>'+
+  '</div>').join('');
+}
+async function inboxWrite(){
+  try{
+    await fetch(inboxUrl(),{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields:{data:{stringValue:JSON.stringify(inboxItems)},updated:{integerValue:String(Date.now())}}})});
+  }catch(e){}
+  renderInbox();
+}
+function inboxAdd(ts){
+  const s=inboxItems.find(x=>x.ts===ts); if(!s)return;
+  const notes='Quote request — 📞 '+s.phone+(s.email?' · ✉️ '+s.email:'')+' · at-fault acc(3yr): '+(s.acc||'?')+' · DWI(5yr): '+(s.dwi||'?')+' · 12mo coverage: '+(s.cov||'?')+(s.state&&s.state!=='NY'?' · ⚠️ NOT NY':'')+(s.renew?' · renews: '+s.renew:'')+(s.notes?' · notes: '+s.notes:'');
+  pipeline.unshift({id:'in'+ts,name:s.name,addr:'',city:s.town||'',zip:'',county:'',filed:'',
+    lines:s.products||'Auto quote',label:'Quote request',status:'New',notes,
+    carrier:s.carrier||'',xdate:'',followUp:new Date().toISOString().slice(0,10),added:new Date().toISOString().slice(0,10),ts:Date.now()});
+  savePipe();
+  inboxItems=inboxItems.filter(x=>x.ts!==ts);
+  inboxWrite();
+  toast('Added — follow-up set for TODAY. Call while it’s hot! 🔥');
+}
+function inboxRemove(ts){inboxItems=inboxItems.filter(x=>x.ts!==ts);inboxWrite()}
 
 /* ================= cloud sync (optional, Firestore REST) ================= */
 const SYNC=(window.SYNC_CONFIG&&window.SYNC_CONFIG.projectId&&window.SYNC_CONFIG.apiKey)?window.SYNC_CONFIG:null;
@@ -1044,7 +1228,8 @@ async function pullCloud(push){
     const r=await fetch(fsUrl());
     let remote=[];
     if(r.status===404){remote=[]}
-    else if(r.ok){const d=await r.json();try{remote=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}catch(e){remote=[]}}
+    else if(r.ok){const d=await r.json();try{remote=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}catch(e){remote=[]}
+      if(d.fields&&d.fields.inbox&&d.fields.inbox.stringValue&&!settings.inboxCode){settings.inboxCode=d.fields.inbox.stringValue;localStorage.setItem(LS_SET,JSON.stringify(settings))}}
     else throw new Error('HTTP '+r.status);
     mergeRemote(remote);
     localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));
@@ -1053,6 +1238,7 @@ async function pullCloud(push){
     if(leads.length)renderLeads();
     if(push!==false){
       const body={fields:{data:{stringValue:JSON.stringify(pipeline)},updated:{integerValue:String(Date.now())}}};
+      if(settings.inboxCode)body.fields.inbox={stringValue:settings.inboxCode};
       const w=await fetch(fsUrl(),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(!w.ok)throw new Error('HTTP '+w.status);
     }

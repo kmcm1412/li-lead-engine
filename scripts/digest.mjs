@@ -25,6 +25,7 @@ function classify(name) {
   for (const [re, label, lines, weight] of KEYWORDS) if (re.test(name)) return { label, lines, weight };
   return { label: '', lines: '', weight: 0 };
 }
+const HARD = new Set(['Contractor', 'Trades', 'Landscaping', 'Trucking/Logistics', 'Day Care', 'Auto Services']);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---- load seen ids ----
@@ -106,7 +107,7 @@ const card = l => `
   <div style="background:#fff;border:1px solid #dde3ec;border-left:5px solid ${l.cls.weight >= 3 ? '#b91c1c' : '#0033A0'};border-radius:8px;padding:12px 16px;margin-bottom:8px">
     <div style="font-weight:700;font-size:15px">${esc(l.name)}</div>
     <div style="color:#5c6675;font-size:13px">${esc(l.addr ? l.addr + ', ' : '')}${esc(l.city)}, NY ${esc(l.zip)} · ${esc(l.county)} County · ${l.type} · filed ${l.filed}</div>
-    ${l.cls.lines ? `<div style="color:#0e7c3f;font-size:13px;font-weight:600">→ Likely needs: ${l.cls.lines}</div>` : ''}
+    ${l.cls.lines ? `<div style="color:#0e7c3f;font-size:13px;font-weight:600">→ Likely needs: ${l.cls.lines}${HARD.has(l.cls.label) ? ' <span style="color:#a95c07">· ⚠ specialty market — pivot to owner’s home + auto</span>' : ' <span style="color:#0c7a3e">· ✅ BOP-friendly</span>'}</div>` : ''}
     <div style="margin-top:6px"><a href="https://www.google.com/search?q=${encodeURIComponent('"' + l.name + '" ' + l.city + ' NY')}" style="color:#0033A0;font-size:13px">🔍 Google this business</a></div>
   </div>`;
 

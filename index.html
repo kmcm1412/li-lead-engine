@@ -171,6 +171,13 @@
         <option value="Nassau">Nassau only</option>
       </select>
     </div>
+    <div class="bizonly"><label>Carrier appetite</label>
+      <select id="fAppetite">
+        <option value="">All classes</option>
+        <option value="easy">✅ Easier to write (BOP box)</option>
+        <option value="hard">⚠️ Specialty / hard to place</option>
+      </select>
+    </div>
     <div class="bizonly2"><label>Filed within</label>
       <select id="fDays">
         <option value="7">Last 7 days</option>
@@ -324,6 +331,8 @@
       <li><b>🏠 New homeowners (Queens)</b> — every recorded home purchase from the city deed registry: buyer name, property, sale price. Deeds post a few weeks after closing — exactly when new owners are settling in, facing their first renewal, and open to a <b>home + auto bundle</b>. Investor/LLC purchases are flagged so you can focus on real people, and known coastal areas get a 🌊 flag.</li>
       <li><b>🏢 New businesses (Suffolk &amp; Nassau)</b> — every brand-new LLC and corporation, usually within a day or two of filing, before they've picked an agent. And every business owner is also a personal-lines household: home, autos, umbrella, life.</li>
     </ul>
+    <h3>"Commercial is too hard to write" — work the appetite, not the class</h3>
+    <p>Commercial feels hard because the classes that <i>need</i> insurance most — contractors, trucking, day cares — are exactly what standard carriers decline. The tool now tags every business lead: <b>✅ BOP-friendly</b> (offices, retail, salons, restaurants, landlords, fitness — standard-market writable) vs <b>⚠️ Specialty market</b> (hard to place). Use the <b>Carrier appetite</b> filter to work only the writable ones. And a ⚠️ lead isn't wasted: "I may not be able to beat your GL, but let me look at your home and auto" — the owner is still a personal-lines household. Landlord/realty LLCs are especially good: that's commercial <i>property</i>, the lines you already specialize in.</p>
     <p><b>The personal-lines writing box</b> (built into the ✅ Qualify tab): auto needs ≤1 accident in 3 years and 12+ months continuous prior coverage with no lapse; homeowners must not be on or near the water; renters, boat, and motorcycle are easy adds. Run every prospect through Qualify before quoting — it applies the rules for you.</p>
     <h3>The 20-minute daily routine</h3>
     <ol>
@@ -415,6 +424,9 @@ function classify(name){
   for(const [re,label,lines,w] of KEYWORDS){ if(re.test(name)) return {label,lines,weight:w}; }
   return {label:'',lines:'',weight:0};
 }
+/* Classes most carriers decline or surcharge (specialty/E&S market) vs. the standard BOP box */
+const HARD_LABELS=new Set(['Contractor','Trades','Landscaping','Trucking/Logistics','Day Care','Auto Services','Security','Waste/Recycling']);
+function isHard(cls){return HARD_LABELS.has(cls.label)}
 
 /* ================= tabs ================= */
 function showTab(t){
@@ -523,7 +535,7 @@ function mapRows(rows){
       addr:[r.dos_process_address_1,r.dos_process_address_2].filter(Boolean).join(', '),
       city:r.dos_process_city||'', state:r.dos_process_state||'NY', zip:(r.dos_process_zip||'').slice(0,5),
       cls, viaAgent,
-      score: cls.weight*10 + Math.max(0,14-ageDays)
+      score: cls.weight*10 + Math.max(0,14-ageDays) + (cls.weight>=2&&!isHard(cls)?6:0)
     };
   });
 }
@@ -551,6 +563,8 @@ function filteredLeads(){
   let out=leads.filter(l=>!hidden[l.id]);
   if(area==='smithtown') out=out.filter(l=>SMITHTOWN_ZIPS.includes(l.zip));
   if(town) out=out.filter(l=>l.city.toLowerCase().includes(town)||l.zip.startsWith(town)||(l.prop&&l.prop.toLowerCase().includes(town)));
+  const app=document.getElementById('fAppetite').value;
+  if(curSource()==='biz'&&app)out=out.filter(l=>app==='hard'?isHard(l.cls):(l.cls.weight>=1&&!isHard(l.cls)));
   const sort=document.getElementById('fSort').value;
   out.sort(sort==='date' ? (a,b)=>b.filed.localeCompare(a.filed) : (a,b)=>b.score-a.score||b.filed.localeCompare(a.filed));
   return out;
@@ -574,6 +588,9 @@ function renderLeads(){
     const prio=l.kind==='home'
       ? (l.indiv?'<span class="chip hot">🏠 Individual buyer</span>':'<span class="chip">Entity / investor</span>')
       : (l.cls.weight>=3?'<span class="chip hot">🔥 High priority</span>':l.cls.weight===2?'<span class="chip warm">Warm</span>':'');
+    const appetite=l.kind!=='home'&&l.cls.label
+      ? (isHard(l.cls)?'<span class="chip warm">⚠️ Specialty market</span>':(l.cls.weight>=2?'<span class="chip new">✅ BOP-friendly</span>':''))
+      : '';
     const fresh=l.kind!=='home'&&l.ageDays<=7?'<span class="chip new">Filed '+(l.ageDays<=1?'today/yesterday':l.ageDays+' days ago')+'</span>':'';
     const addrLine=l.kind==='home'
       ? esc(l.prop)+', Queens, NY'+(l.addr&&l.addr!==l.prop?' · <i>mail: '+esc(l.addr)+', '+esc(l.city)+' '+esc(l.zip)+'</i>':'')
@@ -582,8 +599,8 @@ function renderLeads(){
       '<div class="lead-main">'+
         '<div class="lead-name">'+esc(l.kind==='home'?titleCase(l.name):l.name)+'</div>'+
         '<div class="lead-addr">'+addrLine+'</div>'+
-        (l.cls.lines?'<div class="lines-hint">→ '+(l.kind==='home'?'Quote: ':'Likely needs: ')+l.cls.lines+'</div>':'')+
-        '<div class="lead-meta">'+prio+fresh+
+        (l.cls.lines?'<div class="lines-hint">→ '+(l.kind==='home'?'Quote: ':'Likely needs: ')+l.cls.lines+(l.kind!=='home'&&isHard(l.cls)?' <span style="color:var(--amber)">· hard to place — pivot to the owner’s home + auto bundle</span>':'')+'</div>':'')+
+        '<div class="lead-meta">'+prio+appetite+fresh+
           (l.kind==='home'&&l.price?'<span class="chip new">$'+fmtNum(l.price)+'</span>':'')+
           (l.kind==='home'&&l.water?'<span class="chip flag">🌊 verify water distance</span>':'')+
           '<span class="chip">'+l.type+'</span>'+
@@ -601,7 +618,7 @@ function renderLeads(){
     '</div>';
   }).join('') + (out.length>400?'<div class="note">Showing first 400 of '+out.length+'.</div>':'');
 }
-['fTown','fArea','fSort'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(leads.length)renderLeads()}));
+['fTown','fArea','fSort','fAppetite'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(leads.length)renderLeads()}));
 function hideLead(id){hidden[id]=1;localStorage.setItem(LS_HIDE,JSON.stringify(hidden));renderLeads()}
 
 /* ================= pipeline ================= */
@@ -936,9 +953,11 @@ function renderToday(){
   }
   const hl=document.getElementById('hotList');
   if(!leadsBiz.length){hl.innerHTML='<span class="note">Loading business filings — or open 🔎 Find Leads and refresh.</span>';return}
-  const hot=leadsBiz.filter(l=>!hidden[l.id]&&l.cls.weight>=3&&l.ageDays<=3&&!activeIds.has(l.id)).slice(0,10);
+  const hot=leadsBiz.filter(l=>!hidden[l.id]&&l.cls.weight>=2&&l.ageDays<=3&&!activeIds.has(l.id))
+    .sort((a,b)=>(isHard(a.cls)?1:0)-(isHard(b.cls)?1:0)||b.score-a.score).slice(0,10);
   hl.innerHTML=hot.length?hot.map(l=>'<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line2);flex-wrap:wrap">'+
       '<b style="flex:1;min-width:150px">'+esc(l.name)+'</b><span class="note">'+esc(l.city)+', '+esc(l.county)+'</span>'+
+      (isHard(l.cls)?'<span class="chip warm">⚠️ specialty</span>':(l.cls.weight>=2?'<span class="chip new">✅ BOP</span>':''))+
       (l.cls.lines?'<span class="lines-hint" style="margin:0">'+l.cls.lines+'</span>':'')+
       '<a class="btn small secondary" target="_blank" href="https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+l.city+' NY')+'">🔍</a>'+
       '<button class="btn small" onclick="addToPipe(\''+l.id+'\')">+ Pipeline</button>'+

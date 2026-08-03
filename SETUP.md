@@ -1,6 +1,8 @@
-# LI Lead Engine — enabling sync & email digest
+# LeadEngine LI — setup status
 
-Two optional upgrades are built in and waiting for credentials. Both are free.
+✅ **Cross-device sync: DONE (Aug 3, 2026).** Firebase project `li-lead-engine` created (free Spark plan), Firestore live with rules restricting access to `/pipelines/*`, config deployed in `sync-config.js`, verified end-to-end. Dom just makes up a sync code in **Scripts & Letters** and enters it on each device — nothing else needed.
+
+⬜ **Email digest: one step left (yours — ~3 min).** The digest page already publishes daily; email delivery needs the Gmail secrets below.
 
 ## 1. Daily email digest (~3 minutes)
 
@@ -29,9 +31,9 @@ gh workflow run daily-digest.yml
 
 Note: if no new filings have appeared since the last digest, the email is skipped for that day.
 
-## 2. Cross-device pipeline sync (~10 minutes)
+## 2. Cross-device pipeline sync — ✅ already done, kept for reference
 
-The app already contains the sync engine; it activates when you fill in `sync-config.js`.
+The app already contains the sync engine; it activates when you fill in `sync-config.js`. (Completed Aug 3, 2026 — steps below are for reference/rebuild only.)
 
 1. Go to https://console.firebase.google.com → **Add project** (name: `li-lead-engine`, Analytics off).
 2. In the project: **Build → Firestore Database → Create database** → Production mode → location `nam5 (us-central)`.

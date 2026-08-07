@@ -165,6 +165,13 @@
         <button class="btn small secondary" onclick="copySrc('email')">✉️ Copy for email signature</button>
         <button class="btn small secondary" onclick="openFlyer()">🖨️ Print QR flyer</button>
       </div>
+      <div style="margin-top:8px">📣 <b>Ready-made posts</b> — one click copies a finished post with your link inside:
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <button class="btn small ghost" onclick="copyPost('fb')">Facebook group post</button>
+          <button class="btn small ghost" onclick="copyPost('nextdoor')">Nextdoor post</button>
+          <button class="btn small ghost" onclick="copyPost('text')">Text to send a friend/client</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="help" style="padding:16px 20px">
@@ -172,7 +179,7 @@
     <div id="dueList"></div>
   </div>
   <div class="help" style="padding:16px 20px">
-    <h2 style="margin-bottom:2px">🏠 Newest homeowner leads <span class="note" style="display:inline">— auto + home bundle prospects (Queens deed filings, individual buyers)</span></h2>
+    <h2 style="margin-bottom:2px">🏠 Newest homeowner leads <span class="note" style="display:inline">— auto + home bundle prospects (NYC deed filings, individual buyers)</span></h2>
     <div id="homeList"><div class="note">Loading deed filings…</div></div>
   </div>
   <div class="help" style="padding:16px 20px">
@@ -189,8 +196,17 @@
   <div class="toolbar">
     <div><label>Lead source</label>
       <select id="fSource" onchange="sourceChanged()">
-        <option value="home" selected>🏠 New homeowners — Queens deed filings</option>
+        <option value="home" selected>🏠 New homeowners — NYC deed filings (auto bundles)</option>
         <option value="biz">🏢 New businesses — Suffolk &amp; Nassau</option>
+      </select>
+    </div>
+    <div class="homeonly"><label>Borough (deed registry)</label>
+      <select id="fBoro" onchange="leadsHome=[];fetchLeads()">
+        <option value="4" selected>Queens</option>
+        <option value="3">Brooklyn</option>
+        <option value="5">Staten Island</option>
+        <option value="2">Bronx</option>
+        <option value="1">Manhattan</option>
       </select>
     </div>
     <div class="bizonly"><label>County</label>
@@ -377,6 +393,11 @@
       <span class="note" id="syncStatus"></span>
       <div class="note" id="syncHint">First time: click <b>Create account</b> with any email + a password (6+ characters). Then sign in with the same login on your phone and office computer — everything stays in sync.</div>
     </div>
+    <div id="repBox" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+      <label style="font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">📈 Performance report</label>
+      <label style="font-size:14px;cursor:pointer"><input type="checkbox" id="shareStats" onchange="toggleShare(this.checked)"> Publish a live performance summary at a private link — <b>totals only, never client names</b> — to show the agency what the tool produces</label>
+      <div class="note" id="repRow" style="display:none">Report link: <b id="repLink" style="word-break:break-all;color:var(--blue)"></b> <button class="btn small secondary" onclick="copyRepLink()">📋 Copy</button></div>
+    </div>
   </div>
   <div id="tmplList"></div>
 </div>
@@ -387,7 +408,7 @@
     <h2>What this is</h2>
     <p>Two live feeds of <b>public-record</b> leads, plus the tools to work them:</p>
     <ul>
-      <li><b>🏠 New homeowners (Queens)</b> — every recorded home purchase from the city deed registry: buyer name, property, sale price. Deeds post a few weeks after closing — exactly when new owners are settling in, facing their first renewal, and open to a <b>home + auto bundle</b>. Investor/LLC purchases are flagged so you can focus on real people, and known coastal areas get a 🌊 flag.</li>
+      <li><b>🏠 New homeowners (Queens, Brooklyn, Staten Island, Bronx, Manhattan)</b> — every recorded home purchase from the city deed registry: buyer name, property, sale price. Deeds post a few weeks after closing — exactly when new owners are settling in, facing their first renewal, and open to an <b>auto + home bundle</b>. Investor/LLC purchases are flagged so you can focus on real people, and known coastal areas get a 🌊 flag. Pick the borough in the dropdown.</li>
       <li><b>🏢 New businesses (Suffolk &amp; Nassau)</b> — every brand-new LLC and corporation, usually within a day or two of filing, before they've picked an agent. And every business owner is also a personal-lines household: home, autos, umbrella, life.</li>
     </ul>
     <h3>"Commercial is too hard to write" — work the appetite, not the class</h3>
@@ -452,8 +473,9 @@
 const LS_PIPE='liLeadEngine.pipeline', LS_SET='liLeadEngine.settings', LS_HIDE='liLeadEngine.hidden';
 let leads=[], leadsBiz=[], leadsHome=[], pipeline=[], hidden={}, settings={};
 const ENTITY_RE=/\b(LLC|L\.L\.C|CORP|INC|LTD|TRUST|TRUSTEE|HOLDINGS?|PARTNERS?|LP|REALTY|GROUP|FUND|EQUITIES|ASSOCIATES|DEVELOPMENT|VENTURES|PROPERTIES|CAPITAL|HDFC|CITY OF|BANK|ESTATES? OF)\b/i;
-const COASTAL=['OAKDALE','SOUND BEACH','MASTIC BEACH','LINDENHURST','COPIAGUE','AMITYVILLE','BABYLON','WEST ISLIP','BAY SHORE','GREAT RIVER','SAYVILLE','WEST SAYVILLE','BAYPORT','BLUE POINT','PATCHOGUE','BELLPORT','SHIRLEY','CENTER MORICHES','EAST MORICHES','WESTHAMPTON','HAMPTON BAYS','SOUTHAMPTON','SAG HARBOR','EAST HAMPTON','MONTAUK','FREEPORT','MERRICK','BELLMORE','WANTAGH','SEAFORD','MASSAPEQUA','ISLAND PARK','LONG BEACH','OCEANSIDE','BALDWIN','PORT WASHINGTON','BAYVILLE','NORTHPORT','ASHAROKEN','EATONS NECK','CENTERPORT','HUNTINGTON BAY','LLOYD HARBOR','COLD SPRING HARBOR','STONY BROOK','SETAUKET','PORT JEFFERSON','MOUNT SINAI','MILLER PLACE','ROCKY POINT','SHOREHAM','WADING RIVER','RIVERHEAD','GREENPORT','SOUTHOLD','MATTITUCK','ROCKAWAY','FAR ROCKAWAY','ARVERNE','BROAD CHANNEL','HOWARD BEACH','BREEZY POINT','BELLE HARBOR','NEPONSIT','EDGEMERE','FIRE ISLAND','OCEAN BEACH','CAPTREE','GILGO','OAK BEACH','POINT LOOKOUT','ATLANTIC BEACH','LIDO BEACH'];
-const COASTAL_ZIPS=['11691','11692','11693','11694','11695','11697','11414','11561','11558','11509','11569','11769','11789'];
+const COASTAL=['OAKDALE','SOUND BEACH','MASTIC BEACH','LINDENHURST','COPIAGUE','AMITYVILLE','BABYLON','WEST ISLIP','BAY SHORE','GREAT RIVER','SAYVILLE','WEST SAYVILLE','BAYPORT','BLUE POINT','PATCHOGUE','BELLPORT','SHIRLEY','CENTER MORICHES','EAST MORICHES','WESTHAMPTON','HAMPTON BAYS','SOUTHAMPTON','SAG HARBOR','EAST HAMPTON','MONTAUK','FREEPORT','MERRICK','BELLMORE','WANTAGH','SEAFORD','MASSAPEQUA','ISLAND PARK','LONG BEACH','OCEANSIDE','BALDWIN','PORT WASHINGTON','BAYVILLE','NORTHPORT','ASHAROKEN','EATONS NECK','CENTERPORT','HUNTINGTON BAY','LLOYD HARBOR','COLD SPRING HARBOR','STONY BROOK','SETAUKET','PORT JEFFERSON','MOUNT SINAI','MILLER PLACE','ROCKY POINT','SHOREHAM','WADING RIVER','RIVERHEAD','GREENPORT','SOUTHOLD','MATTITUCK','ROCKAWAY','FAR ROCKAWAY','ARVERNE','BROAD CHANNEL','HOWARD BEACH','BREEZY POINT','BELLE HARBOR','NEPONSIT','EDGEMERE','FIRE ISLAND','OCEAN BEACH','CAPTREE','GILGO','OAK BEACH','POINT LOOKOUT','ATLANTIC BEACH','LIDO BEACH','CONEY ISLAND','BRIGHTON BEACH','SHEEPSHEAD BAY','MANHATTAN BEACH','SEA GATE','GERRITSEN','MILL BASIN','BERGEN BEACH','SOUTH BEACH','MIDLAND BEACH','NEW DORP BEACH','OAKWOOD BEACH','GREAT KILLS','ANNADALE','HUGUENOT','PRINCE\'S BAY','TOTTENVILLE','CITY ISLAND','THROGS NECK','EDGEWATER PARK'];
+const COASTAL_ZIPS=['11691','11692','11693','11694','11695','11697','11414','11561','11558','11509','11569','11769','11789','11224','11235','11234','10305','10306','10307','10308','10312'];
+const BORO={'1':'Manhattan','2':'Bronx','3':'Brooklyn','4':'Queens','5':'Staten Island'};
 function nearWater(town,zip){
   const t=String(town||'').toUpperCase();
   return COASTAL.some(c=>t.includes(c))||COASTAL_ZIPS.includes(String(zip||'').slice(0,5));
@@ -549,6 +571,7 @@ function curSource(){const s=document.getElementById('fSource');return s?s.value
 function sourceChanged(){
   const home=curSource()==='home';
   document.querySelectorAll('.bizonly,.bizonly2').forEach(d=>d.style.display=home?'none':'');
+  document.querySelectorAll('.homeonly').forEach(d=>d.style.display=home?'':'none');
   const area=document.getElementById('fArea');
   if(area){area.parentElement.style.display=home?'none':'';if(home)area.value=''}
   leads=home?leadsHome:leadsBiz;
@@ -583,9 +606,12 @@ async function fetchBiz(){
 }
 async function fetchHomes(){
   const list=document.getElementById('leadList');
-  if(curSource()==='home')list.innerHTML='<div class="loading"><span class="spinner"></span>Pulling the newest recorded home purchases in Queens…</div>';
+  if(curSource()==='home')list.innerHTML='<div class="loading"><span class="spinner"></span>Pulling the newest recorded home purchases…</div>';
+  const boroSel=document.getElementById('fBoro');
+  const boro=(boroSel&&boroSel.value)||'4';
+  const boroName=BORO[boro]||'Queens';
   try{
-    const mUrl="https://data.cityofnewyork.us/resource/bnx9-e6tj.json?$limit=350&$order=recorded_datetime DESC&$where="+encodeURIComponent("doc_type='DEED' AND recorded_borough='4' AND document_amt >= 100000");
+    const mUrl="https://data.cityofnewyork.us/resource/bnx9-e6tj.json?$limit=350&$order=recorded_datetime DESC&$where="+encodeURIComponent("doc_type='DEED' AND recorded_borough='"+boro+"' AND document_amt >= 100000");
     const master=await (await fetch(mUrl)).json();
     if(!Array.isArray(master))throw new Error('bad response');
     const ids=master.map(r=>r.document_id);
@@ -609,7 +635,7 @@ async function fetchHomes(){
       const b0=bs[0];
       const prop=[lg.street_number,lg.street_name].filter(Boolean).join(' ')+(lg.unit?' Unit '+lg.unit:'');
       const mailAddr=(b0.address_1||prop)||'';
-      const city=b0.city||'Queens', zip=(b0.zip||'').slice(0,5), st=b0.state||'NY';
+      const city=b0.city||boroName, zip=(b0.zip||'').slice(0,5), st=b0.state||'NY';
       const recorded=(r.recorded_datetime||'').slice(0,10);
       const price=+r.document_amt||0;
       const water=nearWater(city,zip)||nearWater(lg.street_name,'');
@@ -617,7 +643,7 @@ async function fetchHomes(){
       return {
         id:'H'+r.document_id, kind:'home', name, filed:recorded,
         ageDays:Math.round((Date.now()-new Date(recorded))/864e5),
-        type:PTYPE[lg.property_type], county:'Queens',
+        type:PTYPE[lg.property_type], county:BORO[lg.borough]||boroName,
         addr:mailAddr, city, state:st, zip, prop, price, indiv, water,
         cls:{label:'New homeowner',lines:'Auto + '+(condo?'HO-6 condo':'homeowners')+' bundle'+(water?' · verify water distance':''),weight:indiv?3:1},
         score:(indiv?30:0)+(water?-5:0)+Math.max(0,20-Math.floor((Date.now()-new Date(recorded))/864e5/7))
@@ -695,8 +721,8 @@ function renderLeads(){
   if(!out.length){list.innerHTML='<div class="empty">No filings match these filters. Widen the date range or clear the town filter.</div>';return}
   const inPipe=new Set(activePipe().map(p=>p.id));
   list.innerHTML=out.slice(0,400).map(l=>{
-    const g='https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+(l.kind==='home'?'Queens':l.city)+' NY');
-    const m='https://www.google.com/maps/search/'+encodeURIComponent(l.kind==='home'?(l.prop+', Queens, NY'):(l.addr+', '+l.city+' NY '+l.zip));
+    const g='https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+(l.kind==='home'?l.county:l.city)+' NY');
+    const m='https://www.google.com/maps/search/'+encodeURIComponent(l.kind==='home'?(l.prop+', '+l.county+', NY'):(l.addr+', '+l.city+' NY '+l.zip));
     const prio=l.kind==='home'
       ? (l.indiv?'<span class="chip hot">🏠 Individual buyer</span>':'<span class="chip">Entity / investor</span>')
       : (l.cls.weight>=3?'<span class="chip hot">🔥 High priority</span>':l.cls.weight===2?'<span class="chip warm">Warm</span>':'');
@@ -705,7 +731,7 @@ function renderLeads(){
       : '';
     const fresh=l.kind!=='home'&&l.ageDays<=7?'<span class="chip new">Filed '+(l.ageDays<=1?'today/yesterday':l.ageDays+' days ago')+'</span>':'';
     const addrLine=l.kind==='home'
-      ? esc(l.prop)+', Queens, NY'+(l.addr&&l.addr!==l.prop?' · <i>mail: '+esc(l.addr)+', '+esc(l.city)+' '+esc(l.zip)+'</i>':'')
+      ? esc(l.prop)+', '+esc(l.county)+', NY'+(l.addr&&l.addr!==l.prop?' · <i>mail: '+esc(l.addr)+', '+esc(l.city)+' '+esc(l.zip)+'</i>':'')
       : esc(l.addr? l.addr+', ':'')+esc(l.city)+', NY '+esc(l.zip)+' · '+esc(l.county)+' County'+(l.viaAgent?' · <i>via registered agent</i>':'');
     return '<div class="lead-card">'+
       '<div class="lead-main">'+
@@ -748,7 +774,7 @@ function addManualLead(){
     status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10),ts:Date.now()});
   savePipe();renderPipeline();
 }
-function savePipe(){localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));document.getElementById('pipeCount').textContent=activePipe().filter(p=>['New','Contacted','Quoting'].includes(p.status)).length;renderToday();schedulePush()}
+function savePipe(){localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));document.getElementById('pipeCount').textContent=activePipe().filter(p=>['New','Contacted','Quoting'].includes(p.status)).length;renderToday();schedulePush();scheduleReport()}
 function renderPipeline(){
   savePipe();
   const f=document.getElementById('pFilter').value;
@@ -817,7 +843,7 @@ function exportLeadsCSV(){
   const home=curSource()==='home';
   const rows=home
     ? [['Buyer','Property Address','Borough','Sale Price','Property Type','Recorded','Mailing Address','Mailing City','Mailing ZIP','Individual Buyer','Near Water Flag']]
-        .concat(out.map(l=>[l.name,l.prop,'Queens',l.price,l.type,l.filed,l.addr,l.city,l.zip,l.indiv?'yes':'no',l.water?'verify':'']))
+        .concat(out.map(l=>[l.name,l.prop,l.county,l.price,l.type,l.filed,l.addr,l.city,l.zip,l.indiv?'yes':'no',l.water?'verify':'']))
     : [['Business Name','Address','City','State','ZIP','County','Entity Type','Filed','Category','Suggested Lines']]
         .concat(out.map(l=>[l.name,l.addr,l.city,'NY',l.zip,l.county,l.type,l.filed,l.cls.label,l.cls.lines]));
   downloadCSV(rows,(home?'new-homeowner-leads-':'new-business-leads-')+new Date().toISOString().slice(0,10)+'.csv');
@@ -1061,7 +1087,7 @@ function renderToday(){
     else{
       const homes=leadsHome.filter(l=>!hidden[l.id]&&l.indiv&&!activeIds.has(l.id)).slice(0,8);
       hm.innerHTML=homes.length?homes.map(l=>'<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line2);flex-wrap:wrap">'+
-          '<b style="flex:1;min-width:150px;cursor:pointer" onclick="showDetail(\''+l.id+'\')" title="Full details">'+esc(titleCase(l.name))+'</b><span class="note">'+esc(l.prop)+', Queens</span>'+
+          '<b style="flex:1;min-width:150px;cursor:pointer" onclick="showDetail(\''+l.id+'\')" title="Full details">'+esc(titleCase(l.name))+'</b><span class="note">'+esc(l.prop)+', '+esc(l.county)+'</span>'+
           (l.price?'<span class="chip new">$'+fmtNum(l.price)+'</span>':'')+
           (l.water?'<span class="chip flag">🌊</span>':'')+
           '<button class="btn small" onclick="addToPipe(\''+l.id+'\')">+ Pipeline</button>'+
@@ -1153,7 +1179,7 @@ function showDetail(id){
   let kv='',links=[],note='';
   const inPipe=activePipe().some(p=>p.id===l.id);
   if(l.kind==='home'){
-    kv=kvRow('Property',esc(l.prop)+', Queens, NY')
+    kv=kvRow('Property',esc(l.prop)+', '+esc(l.county)+', NY')
       +kvRow('Sale price',l.price?'$'+fmtNum(l.price):'—')
       +kvRow('Property type',esc(l.type))
       +kvRow('Deed recorded',esc(l.filed))
@@ -1162,9 +1188,9 @@ function showDetail(id){
       +(l.water?kvRow('🌊 Water check','<span style="color:var(--amber);font-weight:600">Known coastal area — verify distance before quoting the home</span>'):'')
       +kvRow('Buyer type',l.indiv?'Individual — personal lines ✓':'Entity / investor — landlord-policy angle')
       +kvRow('The pitch','<b style="color:var(--green)">Auto + '+(String(l.type).includes('Co')?'HO-6 condo':'homeowners')+' bundle</b> before their first renewal');
-    links=[['🗺️ Map','https://www.google.com/maps/search/'+enc(l.prop+', Queens, NY')],
-           ['🏘️ Zillow','https://www.zillow.com/homes/'+enc(l.prop+' Queens NY')+'_rb/'],
-           ['🔍 Google','https://www.google.com/search?q='+enc('"'+personName(l.name)+'" Queens NY')]];
+    links=[['🗺️ Map','https://www.google.com/maps/search/'+enc(l.prop+', '+l.county+', NY')],
+           ['🏘️ Zillow','https://www.zillow.com/homes/'+enc(l.prop+' '+l.county+' NY')+'_rb/'],
+           ['🔍 Google','https://www.google.com/search?q='+enc('"'+personName(l.name)+'" '+l.county+' NY')]];
     note='Phone numbers and emails aren’t part of public deed records — the reliable first touch is the <b>welcome letter</b> (their mailing address is above, one click to print). Anyone who responds to your letter or quote-form link arrives with full contact info attached.';
   }else{
     kv=kvRow('Filing address',esc((l.addr?l.addr+', ':'')+l.city+', NY '+l.zip))
@@ -1282,6 +1308,18 @@ function copySrc(src){
   (navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Copied — submissions from this link will show "via '+src+'"'),()=>toast('Copy blocked'));
 }
 function openFlyer(){window.open('flyer.html?c='+encodeURIComponent(settings.inboxCode),'_blank')}
+const POSTS={
+ fb:l=>'Hi neighbors 👋 I’m Dom Orza, a local Allstate agent here in Smithtown (Troiano Agency). Quick heads-up: auto rates on Long Island jumped again this year, and most drivers I review are overpaying — especially anyone who hasn’t re-shopped in 2+ years. I do free 60-second quote checks, no pressure, no spam. If your renewal is coming up it’s worth a look:\n'+l+'\nOr call/text the office: (631) 724-2100.',
+ nextdoor:l=>'Local tip from a Smithtown neighbor: if your car insurance renewal is coming up, get a second quote before you auto-renew — LI rates moved a lot this year. I’m an Allstate agent at the Troiano Agency on Manor Rd and do free 60-second quote checks: '+l+' — Dom',
+ text:l=>'Hey! It’s Dom Orza (Allstate, Smithtown). Doing free 60-second auto quote checks before renewals — rates jumped this year and most people are overpaying. Takes a minute if you want to see your number: '+l+' — and if you’re happy where you are, no worries at all!',
+};
+function copyPost(kind){
+  const src={fb:'fb-post',nextdoor:'nextdoor',text:'text-blast'}[kind];
+  const txt=POSTS[kind](quoteLink()+'&src='+src);
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(
+    ()=>toast(kind==='text'?'Copied — send to people you know (not cold lists)':'Post copied — paste it into the group'),
+    ()=>toast('Copy blocked'));
+}
 async function fetchInbox(force){
   const card=document.getElementById('inboxCard'); if(!card)return;
   if(!SYNC){card.style.display='none';return}
@@ -1485,11 +1523,60 @@ function initSyncUI(){
 }
 if(SYNC){setInterval(()=>pullCloud(false),90e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pullCloud(false)})}
 
+/* ================= performance report sharing ================= */
+let repTimer=null;
+function reportUrl(){return 'https://firestore.googleapis.com/v1/projects/'+SYNC.projectId+'/databases/(default)/documents/pipelines/report-'+encodeURIComponent(settings.reportCode)+'?key='+SYNC.apiKey}
+function reportLink(){return 'https://kmcm1412.github.io/li-lead-engine/report.html?c='+settings.reportCode}
+function toggleShare(on){
+  settings.shareStats=!!on;
+  if(on&&!settings.reportCode)settings.reportCode='r'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,8);
+  localStorage.setItem(LS_SET,JSON.stringify(settings));
+  renderRepUI();
+  if(on){pushReport();toast('Report sharing is on — copy the link and send it to whoever needs the numbers')}
+}
+function renderRepUI(){
+  const box=document.getElementById('repBox'); if(!box)return;
+  if(!SYNC){box.style.display='none';return}
+  document.getElementById('shareStats').checked=!!settings.shareStats;
+  document.getElementById('repRow').style.display=settings.shareStats?'':'none';
+  if(settings.shareStats)document.getElementById('repLink').textContent=reportLink();
+}
+function copyRepLink(){(navigator.clipboard?navigator.clipboard.writeText(reportLink()):Promise.reject()).then(()=>toast('Report link copied'),()=>toast('Copy blocked'))}
+function buildReport(){
+  const act=activePipe(),months={},srcs={};
+  for(const p of act){
+    const ma=(p.added||'').slice(0,7);
+    if(ma)(months[ma]=months[ma]||{added:0,won:0,prem:0}).added++;
+    if(p.status==='Won'){
+      const mw=(p.wonDate||p.added||'').slice(0,7);
+      if(mw){const m=(months[mw]=months[mw]||{added:0,won:0,prem:0});m.won++;m.prem+=(+p.premium||0)}
+    }
+    const key=p.label==='Quote request'?('Quote form'+(p.src&&p.src!=='direct'?' — '+p.src:'')):(p.label||'Other');
+    const s=(srcs[key]=srcs[key]||{n:0,won:0,prem:0});
+    s.n++;if(p.status==='Won'){s.won++;s.prem+=(+p.premium||0)}
+  }
+  const won=act.filter(p=>p.status==='Won');
+  return {v:1,updated:Date.now(),commRate:+settings.commRate||10,
+    totals:{leads:act.length,won:won.length,premium:won.reduce((s,p)=>s+(+p.premium||0),0),
+      touches:act.reduce((s,p)=>s+(p.touches||0),0),xdates:act.filter(p=>p.xdate).length,
+      quoteRequests:act.filter(p=>p.label==='Quote request').length},
+    months:months,srcs:srcs};
+}
+function scheduleReport(){if(!settings.shareStats||!SYNC)return;clearTimeout(repTimer);repTimer=setTimeout(pushReport,4000)}
+async function pushReport(){
+  if(!settings.shareStats||!SYNC||!settings.reportCode)return;
+  try{
+    await fetch(reportUrl(),{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({fields:{data:{stringValue:JSON.stringify(buildReport())},updated:{integerValue:String(Date.now())}}})});
+  }catch(e){}
+}
+
 /* ================= util ================= */
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 document.getElementById('todayLabel').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 savePipe();
 initSyncUI();
+renderRepUI();
 qCheck();
 sourceChanged();
 fetchBiz();

@@ -37,11 +37,11 @@
 </head>
 <body>
 <div class="hero">
-  <h1>🛡️ Get Your Free Quote</h1>
-  <p>Dom Orza · The Troiano Agency — Allstate · 25 Manor Rd, Smithtown, NY · (631) 724-2100</p>
+  <h1>🚗 Paying Too Much for Car Insurance?</h1>
+  <p>Free 60-second quote check · Dom Orza · The Troiano Agency — Allstate · Smithtown, NY · (631) 724-2100</p>
 </div>
 <div class="card" id="card">
-  <p style="font-size:14.5px;color:var(--muted)">60 seconds, no obligation. Most Long Island drivers who bundle auto + home with us save real money — fill this out and Dom will personally get back to you with numbers.</p>
+  <p style="font-size:14.5px;color:var(--muted)">Long Island auto rates jumped again this year — most drivers who haven’t re-shopped in 2+ years are overpaying, and bundling home or renters makes the discount bigger. 60 seconds, no obligation: Dom will personally get back to you with your numbers.</p>
   <label>Your name *</label><input id="fName" autocomplete="name">
   <div class="row">
     <div><label>Phone *</label><input id="fPhone" type="tel" autocomplete="tel"></div>
@@ -99,6 +99,7 @@ const CFG={apiKey:"AIzaSyBQpiWpPM-sim2Up5RG7NroKfrtePL43i0",projectId:"li-lead-e
 const code=new URLSearchParams(location.search).get('c')||'';
 const picked=new Set();
 document.querySelectorAll('#pills .pill').forEach(p=>p.onclick=()=>{p.classList.toggle('on');const v=p.dataset.v;picked.has(v)?picked.delete(v):picked.add(v)});
+document.querySelector('#pills .pill[data-v="Auto"]').click();
 function fsUrl(){return 'https://firestore.googleapis.com/v1/projects/'+CFG.projectId+'/databases/(default)/documents/pipelines/inbox-'+encodeURIComponent(code)+'?key='+CFG.apiKey}
 async function submitLead(){
   const name=document.getElementById('fName').value.trim();

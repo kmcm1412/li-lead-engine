@@ -43,6 +43,7 @@
 <div class="card" id="card">
   <p style="font-size:14.5px;color:var(--muted)">Long Island auto rates jumped again this year — most drivers who haven’t re-shopped in 2+ years are overpaying, and bundling home or renters makes the discount bigger. 60 seconds, no obligation: Dom will personally get back to you with your numbers.</p>
   <label>Your name *</label><input id="fName" autocomplete="name">
+  <div style="position:absolute;left:-9999px" aria-hidden="true"><label>Website</label><input id="fWeb" tabindex="-1" autocomplete="off"></div>
   <div class="row">
     <div><label>Phone *</label><input id="fPhone" type="tel" autocomplete="tel"></div>
     <div><label>Email</label><input id="fEmail" type="email" autocomplete="email"></div>
@@ -106,6 +107,7 @@ async function submitLead(){
   const phone=document.getElementById('fPhone').value.trim();
   const err=document.getElementById('err');
   err.style.display='none';
+  if(document.getElementById('fWeb').value){document.getElementById('card').style.display='none';document.getElementById('done').style.display='block';return}
   if(!name||!phone){err.textContent='Please add your name and phone number so Dom can reach you — or call (631) 724-2100.';err.style.display='block';return}
   if(!code){err.style.display='block';return}
   const btn=document.getElementById('goBtn');btn.disabled=true;btn.textContent='Sending…';

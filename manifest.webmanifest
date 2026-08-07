@@ -1,0 +1,17 @@
+{
+  "name": "LeadEngine LI — Dom Orza",
+  "short_name": "LeadEngine",
+  "description": "Personal & commercial insurance leads for Long Island, Queens & NY State.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#00256e",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%2300256e'/%3E%3Cpath d='M50 12 84 25v23c0 21-14.5 34.5-34 39C30.5 82.5 16 69 16 48V25Z' fill='%23fff'/%3E%3Cpath d='M50 21 76 31v17c0 16-11 26-26 29.5C35 74 24 64 24 48V31Z' fill='%230033A0'/%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#00256e">
 <title>LeadEngine LI · Dom Orza — The Troiano Agency</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 4 92 20v28c0 26-18 43-42 48C26 91 8 74 8 48V20Z' fill='%230033A0'/%3E%3Cpath d='M50 13 84 26v22c0 21-14.5 35-34 39.5C30.5 83 16 69 16 48V26Z' fill='%23fff'/%3E%3Cpath d='M50 22 76 32v16c0 16-11 26.5-26 30-15-3.5-26-14-26-30V32Z' fill='%230033A0'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -333,7 +334,7 @@
     <div><label>Show</label>
       <select id="pFilter" onchange="renderPipeline()">
         <option value="active" selected>Active (New / Contacted / Quoting)</option>
-        <option value="renewals">📅 Renewals (sorted by x-date)</option>
+        <option value="renewals">📅 Renewals &amp; winbacks (by x-date)</option>
         <option value="all">All</option>
         <option value="New">New</option>
         <option value="Contacted">Contacted</option>
@@ -373,6 +374,7 @@
       <div><label>Email</label><input type="text" id="setEmail" placeholder="you@allstate.com"></div>
       <div><label>Commission rate % (for estimates)</label><input type="text" inputmode="numeric" id="setComm" placeholder="10"></div>
       <div><label>Monthly premium goal $</label><input type="text" inputmode="numeric" id="setGoal" placeholder="15000"></div>
+      <div><label>Google review link (for ⭐ asks)</label><input type="text" id="setReview" placeholder="https://g.page/r/…/review"></div>
     </div>
     <button class="btn small" onclick="saveSettings()">Save</button>
     <span class="note">Saved on this computer only.</span>
@@ -484,7 +486,7 @@ const PTYPE={D1:'1-family home',D2:'2-family home',D3:'3-family home',D4:'4-fami
 try{pipeline=JSON.parse(localStorage.getItem(LS_PIPE)||'[]')}catch(e){pipeline=[]}
 try{hidden=JSON.parse(localStorage.getItem(LS_HIDE)||'{}')}catch(e){hidden={}}
 try{settings=JSON.parse(localStorage.getItem(LS_SET)||'{}')}catch(e){settings={}}
-settings=Object.assign({name:'Dom Orza',agency:'The Troiano Agency – Allstate',phone:'(631) 724-2100',email:'',syncCode:'',commRate:10,goalPrem:''},settings);
+settings=Object.assign({name:'Dom Orza',agency:'The Troiano Agency – Allstate',phone:'(631) 724-2100',email:'',syncCode:'',commRate:10,goalPrem:'',reviewLink:''},settings);
 const selected=new Set();
 function activePipe(){return pipeline.filter(p=>!p.deleted)}
 
@@ -778,7 +780,7 @@ function savePipe(){localStorage.setItem(LS_PIPE,JSON.stringify(pipeline));docum
 function renderPipeline(){
   savePipe();
   const f=document.getElementById('pFilter').value;
-  let items=activePipe().filter(p=> f==='all'?true : f==='active'?['New','Contacted','Quoting'].includes(p.status) : f==='renewals'?(p.xdate&&p.status!=='Lost') : p.status===f);
+  let items=activePipe().filter(p=> f==='all'?true : f==='active'?['New','Contacted','Quoting'].includes(p.status) : f==='renewals'?!!p.xdate : p.status===f);
   const today=new Date().toISOString().slice(0,10);
   if(f==='renewals')items.sort((a,b)=>(a.xdate||'9999').localeCompare(b.xdate||'9999'));
   else items.sort((a,b)=>(a.followUp||'9999').localeCompare(b.followUp||'9999'));
@@ -800,6 +802,7 @@ function renderPipeline(){
             ['New','Contacted','Quoting','Won','Lost'].map(s=>'<option'+(p.status===s?' selected':'')+'>'+s+'</option>').join('')+
           '</select>'+
           '<label class="note">Follow-up:</label><input type="date" value="'+(p.followUp||'')+'" onchange="setFollow(\''+p.id+'\',this.value)">'+
+          (p.status==='Won'?'<button class="btn small secondary" onclick="askReview(\''+p.id+'\')" title="Copy a Google-review request text">⭐ Review ask</button>':'')+
           (p.phone?'<a class="btn small secondary" href="tel:'+esc(p.phone)+'" title="Call '+esc(p.phone)+'">📞 Call</a>':'')+
           (p.email?'<a class="btn small secondary" href="mailto:'+esc(p.email)+'?subject='+encodeURIComponent('Your insurance quote — Dom Orza, The Troiano Agency (Allstate)')+'" title="Email '+esc(p.email)+'">✉️</a>':'')+
           '<a class="btn small secondary" target="_blank" href="'+g+'">🔍</a>'+
@@ -825,6 +828,13 @@ function setXdate(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.xdate=v;p.ts
 function xdate60(id){const p=pipeline.find(x=>x.id===id);if(p&&p.xdate){const d=new Date(p.xdate);d.setDate(d.getDate()-60);p.followUp=d.toISOString().slice(0,10);p.ts=Date.now();savePipe();renderPipeline();toast('Follow-up set to '+p.followUp+' — 60 days before renewal')}}
 function togXsell(id,x){const p=pipeline.find(z=>z.id===id);if(p){p.xsell=p.xsell||[];const i=p.xsell.indexOf(x);i>=0?p.xsell.splice(i,1):p.xsell.push(x);p.ts=Date.now();savePipe();renderPipeline()}}
 function fmtNum(n){return (+n||0).toLocaleString('en-US')}
+function askReview(id){
+  const p=pipeline.find(x=>x.id===id); if(!p)return;
+  if(!settings.reviewLink){toast('Add your Google review link first — ✉️ Scripts & Letters → Your info');showTab('scripts');return}
+  const first=(p.label==='New homeowner'?personName(p.name):p.name).split(' ')[0];
+  const t='Hi '+first+', it’s '+(settings.name||'Dom')+' from Allstate — thanks again for trusting me with your insurance! If you’ve got 30 seconds, a quick Google review helps my local agency more than you’d believe: '+settings.reviewLink;
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Review request copied — text it while the win is fresh ⭐'),()=>toast('Copy blocked'));
+}
 function setFollow(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.followUp=v;p.ts=Date.now();savePipe();renderPipeline()}}
 function setNotes(id,v){const p=pipeline.find(x=>x.id===id);if(p){p.notes=v;p.ts=Date.now();savePipe()}}
 function delPipe(id){if(!confirm('Remove this prospect from your pipeline?'))return;const p=pipeline.find(x=>x.id===id);if(p){p.deleted=true;p.ts=Date.now()}savePipe();renderPipeline()}
@@ -852,8 +862,8 @@ function exportLeadsCSV(){
 function exportPipeCSV(){
   const items=activePipe();
   if(!items.length){toast('Pipeline is empty');return}
-  downloadCSV([['Business Name','Status','Follow-up','Address','City','ZIP','Filed','Suggested Lines','Notes','Added']]
-    .concat(items.map(p=>[p.name,p.status,p.followUp,p.addr,p.city,p.zip,p.filed,p.lines,p.notes,p.added])),'pipeline-'+new Date().toISOString().slice(0,10)+'.csv');
+  downloadCSV([['Name','Status','Follow-up','Phone','Email','Source','Address','City','ZIP','Filed','Lines','Carrier','X-date','Premium','Notes','Added']]
+    .concat(items.map(p=>[p.name,p.status,p.followUp,p.phone||'',p.email||'',p.src||p.label||'',p.addr,p.city,p.zip,p.filed,p.lines,p.carrier||'',p.xdate||'',p.premium||'',p.notes,p.added])),'pipeline-'+new Date().toISOString().slice(0,10)+'.csv');
 }
 
 /* ================= templates ================= */
@@ -970,6 +980,7 @@ function renderTemplates(){
   document.getElementById('setName').value=settings.name;document.getElementById('setAgency').value=settings.agency;
   document.getElementById('setPhone').value=settings.phone;document.getElementById('setEmail').value=settings.email;
   document.getElementById('setComm').value=settings.commRate;document.getElementById('setGoal').value=settings.goalPrem;
+  document.getElementById('setReview').value=settings.reviewLink||'';
   document.getElementById('tmplList').innerHTML=TEMPLATES.map((x,i)=>'<div class="tmpl"><h3>'+x.t+'</h3><div class="use">'+x.u+'</div><pre id="tm'+i+'">'+esc(fill(x.b))+'</pre><button class="btn small secondary" onclick="copyTmpl('+i+')">📋 Copy to clipboard</button></div>').join('');
 }
 function copyTmpl(i){
@@ -983,6 +994,7 @@ function saveSettings(){
   settings.phone=document.getElementById('setPhone').value;settings.email=document.getElementById('setEmail').value;
   settings.commRate=parseFloat(document.getElementById('setComm').value)||10;
   settings.goalPrem=parseFloat(String(document.getElementById('setGoal').value).replace(/[^0-9.]/g,''))||'';
+  settings.reviewLink=document.getElementById('setReview').value.trim();
   localStorage.setItem(LS_SET,JSON.stringify(settings));renderTemplates();renderToday();toast('Saved');
 }
 

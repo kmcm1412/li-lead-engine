@@ -722,7 +722,10 @@ function renderLeads(){
   document.getElementById('stWeekLbl').textContent=home?'Near-water flags':'Filed this week';
   if(!out.length){list.innerHTML='<div class="empty">No filings match these filters. Widen the date range or clear the town filter.</div>';return}
   const inPipe=new Set(activePipe().map(p=>p.id));
-  list.innerHTML=out.slice(0,400).map(l=>{
+  const freshNote=home&&out.length
+    ? '<div class="note" style="margin:2px 0 10px">📅 Deed registry current through <b>'+esc(out.reduce((m,l)=>l.filed>m?l.filed:m,''))+'</b> — the city posts closings in monthly batches, so new leads appear here in waves (that’s the source, not the app). These buyers are still perfectly fresh for a welcome letter.</div>'
+    : '';
+  list.innerHTML=freshNote+out.slice(0,400).map(l=>{
     const g='https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+(l.kind==='home'?l.county:l.city)+' NY');
     const m='https://www.google.com/maps/search/'+encodeURIComponent(l.kind==='home'?(l.prop+', '+l.county+', NY'):(l.addr+', '+l.city+' NY '+l.zip));
     const prio=l.kind==='home'

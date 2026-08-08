@@ -690,9 +690,10 @@ function propAddr(l){
   return l.prop+', '+(oo?l.city:l.county)+', NY'+((oo&&l.zip)?' '+l.zip:'');
 }
 function zillowUrl(l){
-  // Zillow's address deep-links silently fall back to the visitor's last search when they
-  // can't match — a scoped Google search reliably surfaces the exact property page instead.
-  return 'https://www.google.com/search?q='+encodeURIComponent('site:zillow.com '+propAddr(l));
+  // Zillow's own address deep-links silently fall back to the visitor's last search.
+  // DuckDuckGo's "\" operator auto-redirects to the first result; scoping to
+  // zillow.com/homedetails means that result can only be a real property page.
+  return 'https://duckduckgo.com/?q='+encodeURIComponent('\\site:zillow.com/homedetails '+propAddr(l));
 }
 async function lookupBiz(){
   const q=document.getElementById('lkName').value.trim();

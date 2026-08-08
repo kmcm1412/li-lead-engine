@@ -677,6 +677,22 @@ function mapRows(rows){
   });
 }
 function findLead(id){return leads.find(x=>x.id===id)||leadsHome.find(x=>x.id===id)||leadsBiz.find(x=>x.id===id)}
+/* Queens-style addresses ("100-02 Bellaire Pl") only resolve on Zillow/Maps with the real
+   hamlet + ZIP. When the buyer's mailing address IS the property (owner-occupant), use its
+   city/zip; otherwise fall back to the borough. */
+function ownerOccupied(l){
+  const a=String(l.addr||'').replace(/\W/g,'').toUpperCase(),p=String(l.prop||'').replace(/\W/g,'').toUpperCase();
+  return !!(a&&p&&l.city&&a.slice(0,12)===p.slice(0,12));
+}
+function homeCity(l){return l.kind==='home'?(ownerOccupied(l)?l.city:l.county):l.city}
+function propAddr(l){
+  const oo=ownerOccupied(l);
+  return l.prop+', '+(oo?l.city:l.county)+', NY'+((oo&&l.zip)?' '+l.zip:'');
+}
+function zillowUrl(l){
+  // Zillow's router needs its own dash format: /homes/100-02-Bellaire-Place,-Queens-Village,-NY-11429_rb/
+  return 'https://www.zillow.com/homes/'+propAddr(l).replace(/,\s+/g,',-').replace(/\s+/g,'-')+'_rb/';
+}
 async function lookupBiz(){
   const q=document.getElementById('lkName').value.trim();
   if(!q){toast('Type a business name first');return}
@@ -726,8 +742,8 @@ function renderLeads(){
     ? '<div class="note" style="margin:2px 0 10px">📅 Deed registry current through <b>'+esc(out.reduce((m,l)=>l.filed>m?l.filed:m,''))+'</b> — the city posts closings in monthly batches, so new leads appear here in waves (that’s the source, not the app). These buyers are still perfectly fresh for a welcome letter.</div>'
     : '';
   list.innerHTML=freshNote+out.slice(0,400).map(l=>{
-    const g='https://www.google.com/search?q='+encodeURIComponent('"'+l.name+'" '+(l.kind==='home'?l.county:l.city)+' NY');
-    const m='https://www.google.com/maps/search/'+encodeURIComponent(l.kind==='home'?(l.prop+', '+l.county+', NY'):(l.addr+', '+l.city+' NY '+l.zip));
+    const g='https://www.google.com/search?q='+encodeURIComponent(l.kind==='home'?('"'+personName(l.name)+'" '+homeCity(l)+' NY'):('"'+l.name+'" '+l.city+' NY'));
+    const m='https://www.google.com/maps/search/'+encodeURIComponent(l.kind==='home'?propAddr(l):(l.addr+', '+l.city+' NY '+l.zip));
     const prio=l.kind==='home'
       ? (l.indiv?'<span class="chip hot">🏠 Individual buyer</span>':'<span class="chip">Entity / investor</span>')
       : (l.cls.weight>=3?'<span class="chip hot">🔥 High priority</span>':l.cls.weight===2?'<span class="chip warm">Warm</span>':'');
@@ -736,7 +752,7 @@ function renderLeads(){
       : '';
     const fresh=l.kind!=='home'&&l.ageDays<=7?'<span class="chip new">Filed '+(l.ageDays<=1?'today/yesterday':l.ageDays+' days ago')+'</span>':'';
     const addrLine=l.kind==='home'
-      ? esc(l.prop)+', '+esc(l.county)+', NY'+(l.addr&&l.addr!==l.prop?' · <i>mail: '+esc(l.addr)+', '+esc(l.city)+' '+esc(l.zip)+'</i>':'')
+      ? esc(propAddr(l))+(!ownerOccupied(l)&&l.addr?' · <i>mail: '+esc(l.addr)+', '+esc(l.city)+' '+esc(l.zip)+'</i>':'')
       : esc(l.addr? l.addr+', ':'')+esc(l.city)+', NY '+esc(l.zip)+' · '+esc(l.county)+' County'+(l.viaAgent?' · <i>via registered agent</i>':'');
     return '<div class="lead-card">'+
       '<div class="lead-main">'+
@@ -769,7 +785,8 @@ function addToPipe(id){
   const l=leads.find(x=>x.id===id)||leadsHome.find(x=>x.id===id)||leadsBiz.find(x=>x.id===id); if(!l)return;
   const ex=pipeline.find(p=>p.id===id);
   if(ex){ if(ex.deleted){ex.deleted=false;ex.status='New';ex.ts=Date.now();savePipe();renderLeads();toast('Added back to pipeline')} return }
-  pipeline.unshift({id:l.id,name:l.name,addr:l.addr,city:l.city,zip:l.zip,county:l.county,filed:l.filed,lines:l.cls.lines,label:l.cls.label,
+  const prettyName=l.kind==='home'?titleCase(personName(l.name)):l.name;
+  pipeline.unshift({id:l.id,name:prettyName,addr:l.addr,city:l.city,zip:l.zip,county:l.county,filed:l.filed,lines:l.cls.lines,label:l.cls.label,
     status:'New',notes:'',followUp:new Date(Date.now()+864e5).toISOString().slice(0,10),added:new Date().toISOString().slice(0,10),ts:Date.now()});
   savePipe();renderLeads();toast('Added to pipeline — set a follow-up date in the Pipeline tab');
 }
@@ -795,7 +812,7 @@ function renderPipeline(){
     return '<div class="pipe-card status-'+p.status+'">'+
       '<div class="pipe-top">'+
         '<div class="lead-main">'+
-          '<div class="lead-name">'+esc(p.name)+'</div>'+
+          '<div class="lead-name">'+esc(p.label==='New homeowner'?titleCase(personName(p.name)):p.name)+'</div>'+
           '<div class="lead-addr">'+esc(p.addr?p.addr+', ':'')+esc(p.city)+(p.zip?', NY '+esc(p.zip):'')+(p.filed?' · filed '+p.filed:'')+'</div>'+
           (p.lines?'<div class="lines-hint">→ '+p.lines+'</div>':'')+
         '</div>'+
@@ -834,7 +851,7 @@ function fmtNum(n){return (+n||0).toLocaleString('en-US')}
 function askReview(id){
   const p=pipeline.find(x=>x.id===id); if(!p)return;
   if(!settings.reviewLink){toast('Add your Google review link first — ✉️ Scripts & Letters → Your info');showTab('scripts');return}
-  const first=(p.label==='New homeowner'?personName(p.name):p.name).split(' ')[0];
+  const first=titleCase(p.label==='New homeowner'?personName(p.name):p.name).split(' ')[0];
   const t='Hi '+first+', it’s '+(settings.name||'Dom')+' from Allstate — thanks again for trusting me with your insurance! If you’ve got 30 seconds, a quick Google review helps my local agency more than you’d believe: '+settings.reviewLink;
   (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Review request copied — text it while the win is fresh ⭐'),()=>toast('Copy blocked'));
 }
@@ -998,7 +1015,8 @@ function saveSettings(){
   settings.commRate=parseFloat(document.getElementById('setComm').value)||10;
   settings.goalPrem=parseFloat(String(document.getElementById('setGoal').value).replace(/[^0-9.]/g,''))||'';
   settings.reviewLink=document.getElementById('setReview').value.trim();
-  localStorage.setItem(LS_SET,JSON.stringify(settings));renderTemplates();renderToday();toast('Saved');
+  settings.prefsTs=Date.now();
+  localStorage.setItem(LS_SET,JSON.stringify(settings));renderTemplates();renderToday();schedulePush();toast('Saved');
 }
 
 /* ================= mail campaign: letters & labels ================= */
@@ -1009,8 +1027,12 @@ function togSel(id){
   document.getElementById('selCount2').textContent=n;
 }
 function mailTargets(){
-  if(selected.size){const byId=new Map(leads.map(l=>[l.id,l]));return [...selected].map(id=>byId.get(id)).filter(Boolean)}
-  return filteredLeads();
+  let t;
+  if(selected.size){t=[...selected].map(id=>findLead(id)).filter(Boolean)}
+  else t=filteredLeads();
+  const mailable=t.filter(l=>l.addr&&l.city&&l.zip);
+  if(mailable.length<t.length)toast((t.length-mailable.length)+' lead(s) skipped — no complete mailing address on record');
+  return mailable;
 }
 function personName(n){
   return String(n).split(' & ').map(p=>{
@@ -1020,7 +1042,9 @@ function personName(n){
 }
 function titleCase(s){
   return String(s).toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase())
-    .replace(/\bLlc\b/g,'LLC').replace(/\bInc\b/g,'Inc.').replace(/\bCorp\b/g,'Corp.').replace(/\bLtd\b/g,'Ltd.').replace(/\bNy\b/g,'NY').replace(/\bUsa\b/g,'USA');
+    .replace(/\bMc([a-z])/gi,(m,c)=>'Mc'+c.toUpperCase()).replace(/\bO'([a-z])/gi,(m,c)=>"O'"+c.toUpperCase())
+    .replace(/\bLlc\b/g,'LLC').replace(/\bInc\b/g,'Inc.').replace(/\bCorp\b/g,'Corp.').replace(/\bLtd\b/g,'Ltd.').replace(/\bNy\b/g,'NY').replace(/\bUsa\b/g,'USA')
+    .replace(/\bIi\b/g,'II').replace(/\bIii\b/g,'III').replace(/\bJr\b/g,'Jr').replace(/\bSr\b/g,'Sr');
 }
 function openPrintWin(html){
   const w=window.open('','_blank');
@@ -1102,7 +1126,7 @@ function renderToday(){
     else{
       const homes=leadsHome.filter(l=>!hidden[l.id]&&l.indiv&&!activeIds.has(l.id)).slice(0,8);
       hm.innerHTML=homes.length?homes.map(l=>'<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line2);flex-wrap:wrap">'+
-          '<b style="flex:1;min-width:150px;cursor:pointer" onclick="showDetail(\''+l.id+'\')" title="Full details">'+esc(titleCase(l.name))+'</b><span class="note">'+esc(l.prop)+', '+esc(l.county)+'</span>'+
+          '<b style="flex:1;min-width:150px;cursor:pointer" onclick="showDetail(\''+l.id+'\')" title="Full details">'+esc(titleCase(l.name))+'</b><span class="note">'+esc(l.prop)+', '+esc(homeCity(l))+'</span>'+
           (l.price?'<span class="chip new">$'+fmtNum(l.price)+'</span>':'')+
           (l.water?'<span class="chip flag">🌊</span>':'')+
           '<button class="btn small" onclick="addToPipe(\''+l.id+'\')">+ Pipeline</button>'+
@@ -1194,7 +1218,7 @@ function showDetail(id){
   let kv='',links=[],note='';
   const inPipe=activePipe().some(p=>p.id===l.id);
   if(l.kind==='home'){
-    kv=kvRow('Property',esc(l.prop)+', '+esc(l.county)+', NY')
+    kv=kvRow('Property',esc(propAddr(l)))
       +kvRow('Sale price',l.price?'$'+fmtNum(l.price):'—')
       +kvRow('Property type',esc(l.type))
       +kvRow('Deed recorded',esc(l.filed))
@@ -1203,9 +1227,9 @@ function showDetail(id){
       +(l.water?kvRow('🌊 Water check','<span style="color:var(--amber);font-weight:600">Known coastal area — verify distance before quoting the home</span>'):'')
       +kvRow('Buyer type',l.indiv?'Individual — personal lines ✓':'Entity / investor — landlord-policy angle')
       +kvRow('The pitch','<b style="color:var(--green)">Auto + '+(String(l.type).includes('Co')?'HO-6 condo':'homeowners')+' bundle</b> before their first renewal');
-    links=[['🗺️ Map','https://www.google.com/maps/search/'+enc(l.prop+', '+l.county+', NY')],
-           ['🏘️ Zillow','https://www.zillow.com/homes/'+enc(l.prop+' '+l.county+' NY')+'_rb/'],
-           ['🔍 Google','https://www.google.com/search?q='+enc('"'+personName(l.name)+'" '+l.county+' NY')]];
+    links=[['🗺️ Map','https://www.google.com/maps/search/'+enc(propAddr(l))],
+           ['🏘️ Zillow',zillowUrl(l)],
+           ['🔍 Google','https://www.google.com/search?q='+enc('"'+personName(l.name)+'" '+homeCity(l)+' NY')]];
     note='Phone numbers and emails aren’t part of public deed records — the reliable first touch is the <b>welcome letter</b> (their mailing address is above, one click to print). Anyone who responds to your letter or quote-form link arrives with full contact info attached.';
   }else{
     kv=kvRow('Filing address',esc((l.addr?l.addr+', ':'')+l.city+', NY '+l.zip))
@@ -1219,7 +1243,7 @@ function showDetail(id){
     links=[['🔍 Google','https://www.google.com/search?q='+enc('"'+l.name+'" '+l.city+' NY')],
            ['🗺️ Map','https://www.google.com/maps/search/'+enc(l.addr+', '+l.city+' NY '+l.zip)],
            ['📘 Facebook','https://www.facebook.com/search/top?q='+enc(l.name.replace(/,? (LLC|INC\.?|CORP\.?|LTD\.?)$/i,''))],
-           ['🏛️ NY DOS lookup','https://apps.dos.ny.gov/publicInquiry/']];
+           ['🏛️ NY DOS lookup','https://dos.ny.gov/corporation-and-business-entity-search-database']];
     note='Brand-new filings don’t list a phone yet — the Google and Facebook links usually surface one within days of the business opening (check for a website or page). The filing address above is valid for mail <b>immediately</b>.'+(isHard(l.cls)?' <b>This class is hard to place</b> — lead with the owner’s personal home + auto bundle instead.':'');
   }
   document.getElementById('mBody').innerHTML=
@@ -1235,7 +1259,11 @@ function showDetail(id){
 }
 function closeDetail(){document.getElementById('modalBack').classList.remove('open')}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail()});
-function printOne(id){const l=findLead(id);if(l)printLetterPages([l])}
+function printOne(id){
+  const l=findLead(id);if(!l)return;
+  if(l.kind==='home'&&(!l.zip||!l.addr))toast('⚠️ No complete mailing address on record for this one — verify before mailing');
+  printLetterPages([l]);
+}
 function copyAddr(id){
   const l=findLead(id);if(!l)return;
   const t=(l.kind==='home'?titleCase(personName(l.name)):l.name)+'\n'+l.addr+'\n'+l.city+', '+(l.state||'NY')+' '+l.zip;
@@ -1322,7 +1350,10 @@ function copySrc(src){
   const l=quoteLink()+'&src='+src;
   (navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>toast('Copied — submissions from this link will show "via '+src+'"'),()=>toast('Copy blocked'));
 }
-function openFlyer(){window.open('flyer.html?c='+encodeURIComponent(settings.inboxCode),'_blank')}
+function openFlyer(){
+  if(!settings.inboxCode){toast('Sign in first — the flyer QR needs your quote-form link');return}
+  window.open('flyer.html?c='+encodeURIComponent(settings.inboxCode),'_blank');
+}
 const POSTS={
  fb:l=>'Hi neighbors 👋 I’m Dom Orza, a local Allstate agent here in Smithtown (Troiano Agency). Quick heads-up: auto rates on Long Island jumped again this year, and most drivers I review are overpaying — especially anyone who hasn’t re-shopped in 2+ years. I do free 60-second quote checks, no pressure, no spam. If your renewal is coming up it’s worth a look:\n'+l+'\nOr call/text the office: (631) 724-2100.',
  nextdoor:l=>'Local tip from a Smithtown neighbor: if your car insurance renewal is coming up, get a second quote before you auto-renew — LI rates moved a lot this year. I’m an Allstate agent at the Troiano Agency on Manor Rd and do free 60-second quote checks: '+l+' — Dom',
@@ -1358,6 +1389,7 @@ async function fetchInbox(force){
 function qVerdictMini(s){
   if(s.acc==='2+'||s.cov==='no'||s.dwi==='yes'||s.state==='other')return '<span class="chip hot">❌ outside the box</span>';
   if(s.cov==='unsure')return '<span class="chip warm">⚠️ verify coverage history</span>';
+  if(!s.dwi)return '<span class="chip warm">⚠️ verify DWI history</span>';
   return '<span class="chip new">✅ qualifies'+(s.acc==='1'?' (1 acc.)':'')+'</span>';
 }
 function renderInbox(){
@@ -1467,7 +1499,16 @@ async function pullCloud(push){
     if(r.status===404){remote=[]}
     else if(r.ok){const d=await r.json();try{remote=JSON.parse((d.fields&&d.fields.data&&d.fields.data.stringValue)||'[]')}catch(e){remote=[]}
       const ri=d.fields&&d.fields.inbox&&d.fields.inbox.stringValue;
-      if(ri&&ri!==settings.inboxCode){settings.inboxCode=ri;localStorage.setItem(LS_SET,JSON.stringify(settings));lastInboxFetch=0;firstPullDone=true;fetchInbox(true)}}
+      if(ri&&ri!==settings.inboxCode){settings.inboxCode=ri;localStorage.setItem(LS_SET,JSON.stringify(settings));lastInboxFetch=0;firstPullDone=true;fetchInbox(true)}
+      try{
+        const rp=d.fields&&d.fields.prefs&&d.fields.prefs.stringValue?JSON.parse(d.fields.prefs.stringValue):null;
+        if(rp&&(rp.prefsTs||0)>(settings.prefsTs||0)){
+          Object.assign(settings,rp);
+          localStorage.setItem(LS_SET,JSON.stringify(settings));
+          if(document.getElementById('panel-scripts').classList.contains('active'))renderTemplates();
+          renderRepUI();
+        }
+      }catch(e){}}
     else throw new Error('HTTP '+r.status);
     firstPullDone=true;
     mergeRemote(remote);
@@ -1478,6 +1519,7 @@ async function pullCloud(push){
     if(push!==false){
       const body={fields:{data:{stringValue:JSON.stringify(pipeline)},updated:{integerValue:String(Date.now())}}};
       if(settings.inboxCode)body.fields.inbox={stringValue:settings.inboxCode};
+      body.fields.prefs={stringValue:JSON.stringify({name:settings.name,agency:settings.agency,phone:settings.phone,email:settings.email,commRate:settings.commRate,goalPrem:settings.goalPrem,reviewLink:settings.reviewLink,shareStats:settings.shareStats,reportCode:settings.reportCode,prefsTs:settings.prefsTs||0})};
       const w=await fsFetch({method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(!w.ok)throw new Error('HTTP '+w.status);
     }
@@ -1545,7 +1587,9 @@ function reportLink(){return 'https://kmcm1412.github.io/li-lead-engine/report.h
 function toggleShare(on){
   settings.shareStats=!!on;
   if(on&&!settings.reportCode)settings.reportCode='r'+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,8);
+  settings.prefsTs=Date.now();
   localStorage.setItem(LS_SET,JSON.stringify(settings));
+  schedulePush();
   renderRepUI();
   if(on){pushReport();toast('Report sharing is on — copy the link and send it to whoever needs the numbers')}
 }
